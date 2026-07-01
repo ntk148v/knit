@@ -1,0 +1,377 @@
+package skills
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"testing"
+)
+
+// fakeRunner returns the same output for every run call.
+type fakeRunner struct{ out string }
+
+func (f fakeRunner) Run(context.Context, string, ...string) ([]byte, error) {
+	return []byte(f.out), nil
+}
+
+// recordingRunner captures every command invocation for assertion.
+type recordingRunner struct {
+	out   []byte
+	calls [][]string
+}
+
+func (r *recordingRunner) Run(_ context.Context, name string, args ...string) ([]byte, error) {
+	r.calls = append(r.calls, append([]string{name}, args...))
+	return r.out, nil
+}
+
+// sequenceRunner returns outputs sequentially for multiple Run calls.
+type sequenceRunner struct {
+	outs [][]byte
+	idx  int
+}
+
+func (r *sequenceRunner) Run(_ context.Context, name string, args ...string) ([]byte, error) {
+	if r.idx >= len(r.outs) {
+		return nil, nil
+	}
+	out := r.outs[r.idx]
+	r.idx++
+	return out, nil
+}
+
+// ─── Existing tests ──────────────────────────────────────────────────
+
+func TestListInstalledJSON(t *testing.T) {
+	runner := fakeRunner{
+		out: `[{"name":"caveman","path":"/tmp/skills/caveman","scope":"global","agents":["codex"]}]`,
+	}
+	client := NewNpxClientWithRunner(runner)
+	items, err := client.ListInstalled(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 || items[0].Name != "caveman" || items[0].Path != "/tmp/skills/caveman" {
+		t.Fatalf("unexpected: %#v", items)
+	}
+}
+
+func TestFindCLIOutput(t *testing.T) {
+	runner := fakeRunner{
+		out: "Install with npx skills add\n\nvercel-labs/agent-skills@frontend-design 1.2K installs\n└ https://skills.sh/vercel-labs/agent-skills/frontend-design\n\nowner/repo@React Native\n└ https://skills.sh/owner/repo/react-native\n",
+	}
+	items, err := NewNpxClientWithRunner(runner).Find(context.Background(), "frontend")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("got %d items", len(items))
+	}
+	if items[0].Source != "vercel-labs/agent-skills" || items[0].Name != "frontend-design" || items[0].Installs != 1200 || items[0].ID != "vercel-labs/agent-skills/frontend-design" {
+		t.Fatalf("unexpected first: %#v", items[0])
+	}
+	if items[1].Name != "React Native" || items[1].ID != "owner/repo/react-native" {
+		t.Fatalf("unexpected second: %#v", items[1])
+	}
+}
+
+func TestFindShortQuerySkipsRequest(t *testing.T) {
+	items, err := NewNpxClientWithRunner(fakeRunner{out: ""}).Find(context.Background(), "a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 0 {
+		t.Fatalf("expected no results, got %d", len(items))
+	}
+}
+
+func TestSkillDetailAPI(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/skills/vercel-labs/agent-skills/frontend-design" {
+			t.Fatalf("path=%s", r.URL.Path)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id":     "vercel-labs/agent-skills/frontend-design",
+			"source": "vercel-labs/agent-skills",
+			"slug":   "frontend-design",
+			"files": []map[string]any{
+				{"path": "SKILL.md", "contents": "---\nname: frontend-design\ndescription: Pretty UI\n---\n# Frontend\nHello"},
+			},
+		})
+	}))
+	defer server.Close()
+	old := os.Getenv("SKILLS_API_URL")
+	os.Setenv("SKILLS_API_URL", server.URL)
+	defer os.Setenv("SKILLS_API_URL", old)
+	item, err := NewNpxClient().SkillDetail(context.Background(), Skill{
+		Name: "frontend-design", Source: "vercel-labs/agent-skills",
+		ID: "vercel-labs/agent-skills/frontend-design",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if item.Name != "frontend-design" || item.Description != "Pretty UI" || item.Preview == "" {
+		t.Fatalf("unexpected: %#v", item)
+	}
+}
+
+func TestSkillDetailFromDisk(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "skill")
+	if err := os.MkdirAll(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	md := "---\nname: demo\ndescription: Demo skill\n---\n\n# Demo\nHello\n"
+	if err := os.WriteFile(filepath.Join(path, "SKILL.md"), []byte(md), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	item, err := NewNpxClientWithRunner(fakeRunner{out: ""}).SkillDetail(context.Background(), Skill{Path: path})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if item.Name != "demo" || item.Description != "Demo skill" || item.Preview == "" {
+		t.Fatalf("unexpected: %#v", item)
+	}
+}
+
+// ─── Task 4: CLI command arg tests ───────────────────────────────────
+
+func TestMutatingCommandsUseYes(t *testing.T) {
+	r := &recordingRunner{out: []byte("[]")}
+	c := NewNpxClientWithRunner(r)
+	ctx := context.Background()
+
+	_ = c.InstallSkill(ctx, Skill{Name: "frontend-design", Source: "vercel-labs/agent-skills"}, true)
+	_ = c.UpdateSkill(ctx, Skill{Name: "frontend-design"})
+	_ = c.UninstallSkill(ctx, Skill{Name: "frontend-design"})
+
+	want := [][]string{
+		{"npx", "skills", "add", "vercel-labs/agent-skills", "--skill", "frontend-design", "-y", "-g"},
+		{"npx", "skills", "update", "frontend-design", "-y"},
+		{"npx", "skills", "remove", "frontend-design", "-y"},
+	}
+	if !reflect.DeepEqual(r.calls, want) {
+		t.Fatalf("calls mismatch\nwant %#v\n got %#v", want, r.calls)
+	}
+}
+
+func TestMutatingCommandsScopeFlags(t *testing.T) {
+	r := &recordingRunner{out: []byte("[]")}
+	c := NewNpxClientWithRunner(r)
+	ctx := context.Background()
+
+	// Global scope for update/remove.
+	_ = c.UpdateSkill(ctx, Skill{Name: "g-skill", Scope: ScopeGlobal})
+	_ = c.UninstallSkill(ctx, Skill{Name: "g-skill", Scope: ScopeGlobal})
+
+	// Project scope for update.
+	_ = c.UpdateSkill(ctx, Skill{Name: "p-skill", Scope: ScopeProject})
+
+	want := [][]string{
+		{"npx", "skills", "update", "g-skill", "-y", "-g"},
+		{"npx", "skills", "remove", "g-skill", "-y", "-g"},
+		{"npx", "skills", "update", "p-skill", "-y", "-p"},
+	}
+	if !reflect.DeepEqual(r.calls, want) {
+		t.Fatalf("calls mismatch\nwant %#v\n got %#v", want, r.calls)
+	}
+}
+
+func TestAddSourceValidatesWithList(t *testing.T) {
+	r := &recordingRunner{out: []byte("some output")}
+	c := NewNpxClientWithRunner(r)
+	ctx := context.Background()
+
+	_ = c.AddSource(ctx, "vercel-labs/agent-skills")
+	if len(r.calls) != 1 {
+		t.Fatalf("expected 1 call, got %d", len(r.calls))
+	}
+	got := r.calls[0]
+	if len(got) < 5 || got[len(got)-1] != "--list" {
+		t.Fatalf("expected --list as last arg, got %#v", got)
+	}
+}
+
+// ─── Task 3: Enrichment ────────────────────────────────────────────
+
+func TestEnrichInstalledSourceFromLock(t *testing.T) {
+	dir := t.TempDir()
+	lockDir := filepath.Join(dir, "node_modules", ".skills")
+	if err := os.MkdirAll(lockDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	lockFile := filepath.Join(lockDir, "skills-lock.json")
+	lockContent := `{"skills":[{"name":"caveman","source":"ntk148v/skills","repo":"github.com/ntk148v/skills"}]}`
+	if err := os.WriteFile(lockFile, []byte(lockContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	skillDir := filepath.Join(dir, "node_modules", ".skills", "caveman")
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("# test"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	c := &NpxClient{}
+	got := c.enrichInstalled([]Skill{
+		{Name: "caveman", Path: skillDir, Scope: ScopeProject},
+	})
+	if len(got) != 1 {
+		t.Fatalf("got %d skills", len(got))
+	}
+	if got[0].Source != "github.com/ntk148v/skills" {
+		t.Fatalf("source not enriched: %q", got[0].Source)
+	}
+	if len(got[0].Warnings) != 0 {
+		t.Fatalf("unexpected warnings: %v", got[0].Warnings)
+	}
+}
+
+func TestEnrichInstalledBrokenSkill(t *testing.T) {
+	dir := t.TempDir()
+	badDir := filepath.Join(dir, "broken-skill")
+	if err := os.MkdirAll(badDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// No SKILL.md - broken
+	c := &NpxClient{}
+	got := c.enrichInstalled([]Skill{
+		{Name: "broken", Path: badDir, Scope: ScopeGlobal},
+	})
+	if len(got) != 1 || len(got[0].Warnings) == 0 || got[0].Warnings[0] != "broken (SKILL.md missing)" {
+		t.Fatalf("expected broken warning, got %#v", got[0].Warnings)
+	}
+}
+
+// ─── Task 7: Installed skills merge ──────────────────────────────────
+
+func TestListInstalledMergesProjectAndGlobal(t *testing.T) {
+	r := &sequenceRunner{outs: [][]byte{
+		[]byte(`[{"name":"project-skill","path":"/repo/.agents/skills/project-skill","scope":"project","agents":["codex"]}]`),
+		[]byte(`[{"name":"global-skill","path":"/home/me/.agents/skills/global-skill","scope":"global","agents":["codex"]}]`),
+	}}
+	c := NewNpxClientWithRunner(r)
+	got, err := c.ListInstalled(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected 2 skills, got %d: %#v", len(got), got)
+	}
+	names := map[string]bool{}
+	for _, s := range got {
+		names[s.Name] = true
+	}
+	if !names["project-skill"] || !names["global-skill"] {
+		t.Fatalf("missing skills: %#v", names)
+	}
+}
+
+func TestListInstalledDeduplicates(t *testing.T) {
+	r := &sequenceRunner{outs: [][]byte{
+		[]byte(`[{"name":"same","path":"/p","scope":"project","agents":["codex"]}]`),
+		[]byte(`[{"name":"same","path":"/p","scope":"project","agents":["codex"]}]`),
+	}}
+	c := NewNpxClientWithRunner(r)
+	got, err := c.ListInstalled(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("expected 1 after dedup, got %d", len(got))
+	}
+}
+
+// ─── Task 6: Detail cache ────────────────────────────────────────────
+
+func TestSkillDetailCachesResult(t *testing.T) {
+	callCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id":     "src/name",
+			"source": "src",
+			"slug":   "name",
+			"files":  []map[string]any{{"path": "SKILL.md", "contents": "---\nname: cached\n---\nContent"}},
+		})
+	}))
+	defer server.Close()
+	old := os.Getenv("SKILLS_API_URL")
+	os.Setenv("SKILLS_API_URL", server.URL)
+	defer os.Setenv("SKILLS_API_URL", old)
+
+	c := NewNpxClient()
+	ctx := context.Background()
+	sk := Skill{Name: "name", Source: "src", ID: "src/name"}
+
+	// First call hits API.
+	_, _ = c.SkillDetail(ctx, sk)
+	// Second call should use cache.
+	item, err := c.SkillDetail(ctx, sk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if callCount != 1 {
+		t.Fatalf("expected 1 API call, got %d", callCount)
+	}
+	if item.Name != "cached" {
+		t.Fatalf("expected cached name 'cached', got %q", item.Name)
+	}
+}
+
+func TestParseListAvailableCurrentGroupedOutput(t *testing.T) {
+	out := strings.Join([]string{
+		"\u25c6  Available Skills",
+		"",
+		"Utilities",
+		"  grill-with-doc",
+		"    Interview the user using documentation context.",
+		"  code-reviewer",
+		"    Review code for correctness and maintainability.",
+		"",
+		"\u25c6  Use --skill <name> to install specific skills",
+	}, "\n")
+
+	got := parseListAvailable(out, "ntk148v/skills")
+	want := []Skill{
+		{
+			Name:        "grill-with-doc",
+			Source:      "ntk148v/skills",
+			ID:          "ntk148v/skills/grill-with-doc",
+			Description: "Interview the user using documentation context.",
+		},
+		{
+			Name:        "code-reviewer",
+			Source:      "ntk148v/skills",
+			ID:          "ntk148v/skills/code-reviewer",
+			Description: "Review code for correctness and maintainability.",
+		},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("parsed skills mismatch\nwant %#v\n got %#v", want, got)
+	}
+}
+
+func TestInstallSkillScopeFlags(t *testing.T) {
+	r := &recordingRunner{out: []byte("[]")}
+	c := NewNpxClientWithRunner(r)
+	ctx := context.Background()
+
+	_ = c.InstallSkill(ctx, Skill{Name: "grill-with-doc", Source: "ntk148v/skills"}, false)
+	_ = c.InstallSkill(ctx, Skill{Name: "grill-with-doc", Source: "ntk148v/skills"}, true)
+
+	want := [][]string{
+		{"npx", "skills", "add", "ntk148v/skills", "--skill", "grill-with-doc", "-y"},
+		{"npx", "skills", "add", "ntk148v/skills", "--skill", "grill-with-doc", "-y", "-g"},
+	}
+	if !reflect.DeepEqual(r.calls, want) {
+		t.Fatalf("calls mismatch\nwant %#v\n got %#v", want, r.calls)
+	}
+}

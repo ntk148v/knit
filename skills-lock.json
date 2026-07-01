@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "skills": {
+    "caveman": {
+      "source": "juliusbrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/caveman/SKILL.md",
+      "computedHash": "1902fa0b569912d0c05736d8d98a72097d9b82719aac88c0c1d03bb546f9176d"
+    },
+    "code-reviewer": {
+      "source": "ntk148v/skills",
+      "sourceType": "github",
+      "skillPath": "skills/code-reviewer/SKILL.md",
+      "computedHash": "e8df88963d71f0aad51159ed8edbfec5267ecaf32768f155e86bfde38ae5b173"
+    },
+    "conventional-commits": {
+      "source": "ntk148v/skills",
+      "sourceType": "github",
+      "skillPath": "skills/conventional-commits/SKILL.md",
+      "computedHash": "991186975e31dfd1eac4000636e6dbfd82275e3c8dea37251fd28857b0e170fe"
+    },
+    "deep-wiki": {
+      "source": "ntk148v/skills",
+      "sourceType": "github",
+      "skillPath": "skills/deep-wiki/SKILL.md",
+      "computedHash": "8232e67463162eea55b0290a34f448cc762afb54313ba4329dc722ee9b26cba0"
+    },
+    "frontend-design": {
+      "source": "ntk148v/skills",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-design/SKILL.md",
+      "computedHash": "5565b304715e9195756e4b5186aadabba8831a5382dfc481ab6c1220e5e17e57"
+    },
+    "grill": {
+      "source": "ntk148v/skills",
+      "sourceType": "github",
+      "skillPath": "skills/grill/SKILL.md",
+      "computedHash": "0d0150558809a425fc6d1c1d819d284d57b7f5600510e78e93be282c57abb1b6"
+    },
+    "grill-with-docs": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/grill-with-docs/SKILL.md",
+      "computedHash": "e7ef25bbee50cda2eb7b3a8ef541db0a0396dad7d369f7d14fb610671dd1864b"
+    },
+    "handoff": {
+      "source": "ntk148v/skills",
+      "sourceType": "github",
+      "skillPath": "skills/handoff/SKILL.md",
+      "computedHash": "eab9bf1483c32b17685a14ef842e98ac38fe9e3a83fc0e74943bf6d3b4d43806"
+    },
+    "native-web-search": {
+      "source": "ntk148v/skills",
+      "sourceType": "github",
+      "skillPath": "skills/native-web-search/SKILL.md",
+      "computedHash": "3447942e11ea7ba33066f70c08bca84a2684c8a8072a88f377be7eaf5dbd4394"
+    },
+    "repo-analyzer": {
+      "source": "ntk148v/skills",
+      "sourceType": "github",
+      "skillPath": "skills/repo-analyzer/SKILL.md",
+      "computedHash": "5e7fd356371e1c5257de1c0edfc355fc3599950e49a6889de8d6926a7c7428ef"
+    },
+    "security-expert": {
+      "source": "ntk148v/skills",
+      "sourceType": "github",
+      "skillPath": "skills/security-expert/SKILL.md",
+      "computedHash": "f7c4cec8f67146338bace4469be4ff983702af518331ad3fa4f480f91257befe"
+    },
+    "skill-authoring": {
+      "source": "ntk148v/skills",
+      "sourceType": "github",
+      "skillPath": "skills/skill-authoring/SKILL.md",
+      "computedHash": "ac12a7b627f91121727bad9f568c1861851f65e10402d994dd28c4efc2665d5c"
+    },
+    "summarize": {
+      "source": "ntk148v/skills",
+      "sourceType": "github",
+      "skillPath": "skills/summarize/SKILL.md",
+      "computedHash": "75dc16eedb838cdc049c217f1290e92b2bc9d0b3cb846f993ff727ae43a83a22"
+    },
+    "system-performance": {
+      "source": "ntk148v/skills",
+      "sourceType": "github",
+      "skillPath": "skills/system-performance/SKILL.md",
+      "computedHash": "a9c803880952290ca1a360d2107a3524b64e4f043d7fbeb57a655df0b4d2af66"
+    },
+    "uv": {
+      "source": "astral-sh/claude-code-plugins",
+      "sourceType": "github",
+      "skillPath": "plugins/astral/skills/uv/SKILL.md",
+      "computedHash": "b1ca9e9826d906f6ee6ea172da50018ec13bb622ac9ba7204bda8b10e7fc8d0a"
+    }
+  }
+}
