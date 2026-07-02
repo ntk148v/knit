@@ -89,6 +89,8 @@ type model struct {
 	actionSel   int
 	addSourceIn textinput.Model
 
+	detailBack mode
+
 	// Source detail page
 	sourceDetail   skills.Source
 	sourceSkills   []skills.Skill
@@ -338,7 +340,12 @@ func (m *model) handleKey(k tea.KeyMsg) tea.Cmd {
 	if m.mode == modeDetail {
 		switch k.String() {
 		case "esc":
-			m.mode = modeNormal
+			back := m.detailBack
+			if back == 0 {
+				back = modeNormal
+			}
+			m.mode = back
+			m.detailBack = 0
 			return nil
 		case "h", "left":
 			m.detailSel = 0
@@ -457,6 +464,7 @@ func (m *model) handleInstalled(k tea.KeyMsg) tea.Cmd {
 			return nil
 		}
 		m.focus = focusList
+		m.detailBack = modeNormal
 		return m.openDetail(item)
 	case "c":
 		if m.currentInstalled().Name == "" {
@@ -527,6 +535,7 @@ func (m *model) handleDiscover(k tea.KeyMsg) tea.Cmd {
 			return nil
 		}
 		m.focus = focusList
+		m.detailBack = modeNormal
 		return m.openDetail(item)
 	case "i":
 		item := m.currentDiscover()
@@ -913,8 +922,8 @@ func (m *model) detailView() string {
 		agents = "\nAgents: " + strings.Join(m.detail.Agents, ", ")
 	}
 	head := fmt.Sprintf("Scope: [%s]\nStatus: %s\nSource: %s\nPath: %s%s",
-		strings.Title(string(m.detail.Scope)),
-		statusText(m.detail.Status),
+		detailScopeText(m.detail.Scope),
+		detailStatusText(m.detail),
 		emptyDash(m.detail.Source),
 		emptyDash(m.detail.Path),
 		agents)
@@ -1020,6 +1029,9 @@ func (m *model) ensurePreviewContent(content string) {
 }
 
 func (m *model) openDetail(s skills.Skill) tea.Cmd {
+	if m.detailBack == 0 {
+		m.detailBack = modeNormal
+	}
 	m.detail = s
 	m.detailSel = 0
 	m.previewContent = "" // force re-render when detail data arrives
@@ -1031,12 +1043,48 @@ func (m *model) openDetail(s skills.Skill) tea.Cmd {
 		d, err := m.client.SkillDetail(m.ctx, s)
 		if err == nil {
 			if d.Name != "" {
-				m.detail = d
+				m.detail = mergeDetailSkill(m.detail, d)
 			}
-			// Preview will be loaded in detailView() via ensurePreviewContent.
 		}
 		return loadedMsg{}
 	}
+}
+
+func mergeDetailSkill(base, detail skills.Skill) skills.Skill {
+	if detail.Name != "" {
+		base.Name = detail.Name
+	}
+	if detail.Source != "" {
+		base.Source = detail.Source
+	}
+	if detail.Scope != "" {
+		base.Scope = detail.Scope
+	}
+	if detail.Status != "" {
+		base.Status = detail.Status
+	}
+	if detail.Path != "" {
+		base.Path = detail.Path
+	}
+	if detail.Folder != "" {
+		base.Folder = detail.Folder
+	}
+	if len(detail.Agents) > 0 {
+		base.Agents = detail.Agents
+	}
+	if detail.Description != "" {
+		base.Description = detail.Description
+	}
+	if detail.Preview != "" {
+		base.Preview = detail.Preview
+	}
+	if len(detail.Warnings) > 0 {
+		base.Warnings = detail.Warnings
+	}
+	if detail.Installs != 0 {
+		base.Installs = detail.Installs
+	}
+	return base
 }
 
 // ─── Actions ─────────────────────────────────────────────────────────
@@ -1255,7 +1303,8 @@ func (m *model) handleSourceDetailKey(k tea.KeyMsg) tea.Cmd {
 		if item.Name == "" {
 			return nil
 		}
-		return m.openDetail(item)
+		m.detailBack = modeSourceDetail
+		return m.openDetail(m.enrichSourceSkillForDetail(item))
 	case "i":
 		item := m.currentSourceSkill()
 		if item.Name == "" {
@@ -1289,6 +1338,23 @@ func (m *model) currentSourceSkill() skills.Skill {
 		return skills.Skill{}
 	}
 	return m.sourceSkills[m.sourceSkillSel]
+}
+
+func (m *model) enrichSourceSkillForDetail(item skills.Skill) skills.Skill {
+	if item.Source == "" {
+		item.Source = m.sourceDetail.Name
+	}
+	if item.ID == "" && item.Source != "" && item.Name != "" {
+		item.ID = item.Source + "/" + item.Name
+	}
+	for _, installed := range m.installed {
+		if installed.Name == item.Name && installed.Source == item.Source {
+			return mergeDetailSkill(item, installed)
+		}
+	}
+	item.Status = skills.SkillStatus("available")
+	item.Scope = ""
+	return item
 }
 
 func (m *model) sourceDetailView() string {
@@ -1371,6 +1437,23 @@ func statusText(s skills.SkillStatus) string {
 		return "unknown"
 	}
 	return string(s)
+}
+
+func detailStatusText(s skills.Skill) string {
+	if s.Status == skills.SkillStatus("available") {
+		return "Available"
+	}
+	if s.Scope != "" {
+		return "Installed"
+	}
+	return statusText(s.Status)
+}
+
+func detailScopeText(scope skills.Scope) string {
+	if scope == "" {
+		return "-"
+	}
+	return strings.Title(string(scope))
 }
 func emptyDash(s string) string {
 	if s == "" {

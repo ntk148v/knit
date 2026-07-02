@@ -224,6 +224,70 @@ func TestSourceDetailEnterOpensDetail(t *testing.T) {
 	}
 }
 
+func TestSourceDetailEscReturnsToSourceSkillList(t *testing.T) {
+	m := newTestModel()
+	m.mode = modeSourceDetail
+	m.sourceDetail = skills.Source{Name: "ntk148v/skills", Repo: "github.com/ntk148v/skills"}
+	m.sourceSkills = []skills.Skill{{Name: "caveman", Source: "ntk148v/skills", ID: "ntk148v/skills/caveman"}}
+	m.sourceSkillSel = 0
+
+	cmd := m.handleSourceDetailKey(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatal("expected detail load command")
+	}
+	if m.mode != modeDetail {
+		t.Fatalf("expected modeDetail after Enter, got %d", m.mode)
+	}
+
+	m.handleKey(tea.KeyMsg{Type: tea.KeyEsc})
+	if m.mode != modeSourceDetail {
+		t.Fatalf("expected Esc from source-opened detail to return to modeSourceDetail, got %d", m.mode)
+	}
+	if m.sourceDetail.Name != "ntk148v/skills" || m.sourceSkillSel != 0 {
+		t.Fatalf("source detail selection not preserved: source=%#v sel=%d", m.sourceDetail, m.sourceSkillSel)
+	}
+}
+
+func TestSourceDetailAvailableSkillMetadata(t *testing.T) {
+	m := newTestModel()
+	m.mode = modeSourceDetail
+	m.sourceDetail = skills.Source{Name: "ntk148v/skills", Repo: "github.com/ntk148v/skills"}
+	m.sourceSkills = []skills.Skill{{Name: "caveman", Source: "ntk148v/skills", ID: "ntk148v/skills/caveman"}}
+
+	m.handleSourceDetailKey(tea.KeyMsg{Type: tea.KeyEnter})
+	out := m.detailView()
+	for _, want := range []string{"Status: Available", "Scope: [-]", "Source: ntk148v/skills"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("metadata missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "Status: unknown") || strings.Contains(out, "Scope: []") {
+		t.Fatalf("metadata still shows empty/unknown state:\n%s", out)
+	}
+}
+
+func TestSourceDetailInstalledSkillMetadataUsesInstalledScope(t *testing.T) {
+	m := newTestModel()
+	m.mode = modeSourceDetail
+	m.sourceDetail = skills.Source{Name: "ntk148v/skills", Repo: "github.com/ntk148v/skills"}
+	m.installed = []skills.Skill{{
+		Name:   "caveman",
+		Source: "ntk148v/skills",
+		Scope:  skills.ScopeProject,
+		Status: skills.SkillStatusEnabled,
+		Path:   ".agents/skills/caveman/SKILL.md",
+	}}
+	m.sourceSkills = []skills.Skill{{Name: "caveman", Source: "ntk148v/skills", ID: "ntk148v/skills/caveman"}}
+
+	m.handleSourceDetailKey(tea.KeyMsg{Type: tea.KeyEnter})
+	out := m.detailView()
+	for _, want := range []string{"Status: Installed", "Scope: [Project]", "Source: ntk148v/skills", "Path: .agents/skills/caveman/SKILL.md"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("metadata missing %q:\n%s", want, out)
+		}
+	}
+}
+
 func TestInstalledRowsShowScopeBadges(t *testing.T) {
 	m := newTestModel()
 	m.installed = []skills.Skill{
