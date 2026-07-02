@@ -578,3 +578,54 @@ func TestRemoveSourceRemovesInstalledSkillsFromThatSource(t *testing.T) {
 		t.Fatal("expected at least one npx call")
 	}
 }
+
+// ─── Hash helpers ────────────────────────────────────────────────────
+
+func writeFile(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSourceGitURLFromOwnerRepo(t *testing.T) {
+	got, ok := sourceGitURL("ntk148v/skills")
+	if !ok || got != "https://github.com/ntk148v/skills.git" {
+		t.Fatalf("got %q/%v", got, ok)
+	}
+}
+
+func TestSourceGitURLFromHTTPS(t *testing.T) {
+	got, ok := sourceGitURL("https://github.com/ntk148v/skills")
+	if !ok || got != "https://github.com/ntk148v/skills.git" {
+		t.Fatalf("got %q/%v", got, ok)
+	}
+}
+
+func TestSourceGitURLRejectsMarketplaceJSON(t *testing.T) {
+	got, ok := sourceGitURL("https://example.com/marketplace.json")
+	if ok || got != "" {
+		t.Fatalf("got %q/%v", got, ok)
+	}
+}
+
+func TestSkillDetailLoadsPreviewFromCachedSource(t *testing.T) {
+	t.Setenv("KNIT_SOURCE_CACHE_DIR", t.TempDir())
+	cache := sourceCacheDir("ntk148v/skills")
+	if err := os.MkdirAll(filepath.Join(cache, "conventional-commits"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(cache, "conventional-commits", "SKILL.md"), "---\nname: conventional-commits\ndescription: Commit messages\n---\n\n# Conventional Commits\n")
+
+	c := NewNpxClientWithRunner(&recordingRunner{})
+	got, err := c.SkillDetail(context.Background(), Skill{Name: "conventional-commits", Source: "ntk148v/skills"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Description != "Commit messages" || !strings.Contains(got.Preview, "Conventional Commits") {
+		t.Fatalf("bad detail: %#v", got)
+	}
+}

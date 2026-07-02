@@ -288,6 +288,53 @@ func TestSourceDetailInstalledSkillMetadataUsesInstalledScope(t *testing.T) {
 	}
 }
 
+// ─── Task 3: Installed metadata for source skills ─────────────────────
+
+func TestSameSkillMatchesNameAndSource(t *testing.T) {
+	if !sameSourceSkill(
+		skills.Skill{Name: "conventional-commits", Source: "ntk148v/skills"},
+		skills.Skill{Name: "conventional-commits", Source: "ntk148v/skills"},
+	) {
+		t.Fatal("expected match")
+	}
+	if sameSourceSkill(
+		skills.Skill{Name: "conventional-commits", Source: "other/source"},
+		skills.Skill{Name: "conventional-commits", Source: "ntk148v/skills"},
+	) {
+		t.Fatal("source mismatch should not match")
+	}
+}
+
+func TestSourceDetailInstalledSkillMetadataUsesInstalledScopeAndPreview(t *testing.T) {
+	m := newTestModel()
+	m.tab = TabSources
+	m.mode = modeSourceDetail
+	m.sourceDetail = skills.Source{Name: "ntk148v/skills", Repo: "github.com/ntk148v/skills"}
+	m.sourceSkills = []skills.Skill{{Name: "conventional-commits", Source: "ntk148v/skills"}}
+	m.installed = []skills.Skill{{
+		Name:        "conventional-commits",
+		Source:      "ntk148v/skills",
+		Scope:       skills.ScopeProject,
+		Path:        ".agents/skills/conventional-commits",
+		Enabled:     true,
+		Description: "Commit message rules",
+		Preview:     "# Conventional Commits\n",
+	}}
+
+	cmd := m.handleSourceDetailKey(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatal("expected detail load command")
+	}
+	out := m.detailView()
+	for _, want := range []string{"Status: Installed", "Scope: [Project]", "Source: ntk148v/skills", "Path: .agents/skills/conventional-commits", "Description: Commit message rules"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("detail missing %q:\n%s", want, out)
+		}
+	}
+}
+
+// ─── Existing tests follow ───────────────────────────────────────────
+
 func TestInstalledDetailEscStillReturnsToNormalMode(t *testing.T) {
 	m := newTestModel()
 	m.mode = modeNormal
@@ -423,6 +470,50 @@ func TestRowStyleSelectedMatches(t *testing.T) {
 }
 
 // Verify scope badge content matches scope field.
+// ─── Task 1: Numeric search input ──────────────────────────────────────
+
+func TestDigitTypesIntoFocusedInstalledSearch(t *testing.T) {
+	m := newTestModel()
+	m.tab = TabInstalled
+	m.focus = focusSearch
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("1")})
+	m = updated.(*model)
+
+	if m.tab != TabInstalled {
+		t.Fatalf("tab changed to %v", m.tab)
+	}
+	if m.installedSearch != "1" {
+		t.Fatalf("installedSearch=%q, want 1", m.installedSearch)
+	}
+}
+
+func TestDigitSwitchesTabWhenSearchNotFocused(t *testing.T) {
+	m := newTestModel()
+	m.tab = TabInstalled
+	m.focus = focusList
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("3")})
+	m = updated.(*model)
+
+	if m.tab != TabSources {
+		t.Fatalf("tab=%v, want Sources", m.tab)
+	}
+}
+
+func TestTabStillSwitchesWhileSearchFocused(t *testing.T) {
+	m := newTestModel()
+	m.tab = TabInstalled
+	m.focus = focusSearch
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m = updated.(*model)
+
+	if m.tab != TabDiscover {
+		t.Fatalf("tab=%v, want Discover", m.tab)
+	}
+}
+
 func TestScopeBadgeContent(t *testing.T) {
 	s := newStyles()
 	if !strings.Contains(scopeBadge(s, skills.ScopeGlobal), "G") {

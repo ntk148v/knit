@@ -3,6 +3,8 @@ package skills
 import (
 	"bufio"
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -497,6 +499,16 @@ func (c *NpxClient) SkillDetail(ctx context.Context, skill Skill) (Skill, error)
 		return d, nil
 	}
 
+	// Source git cache: lazy clone and read SKILL.md for non-installed
+	// source skills without hitting the remote API.
+	if skill.Source != "" && skill.Name != "" {
+		if md, err := c.loadSourceSkillMarkdown(ctx, skill.Source, skill.Name); err == nil {
+			d := mergeSkillMarkdown(skill, md)
+			c.detailCache[key] = d
+			return d, nil
+		}
+	}
+
 	// Remote API.
 	id := skill.ID
 	if id == "" {
@@ -813,3 +825,73 @@ func parseCount(s, suffix string) int {
 }
 
 func IsNotFound(err error) bool { return err != nil && errors.Is(err, exec.ErrNotFound) }
+
+// ─── Source git URL and cache ────────────────────────────────────────
+
+func sourceGitURL(source string) (string, bool) {
+	source = strings.TrimSpace(source)
+	if source == "" || strings.HasSuffix(source, ".json") {
+		return "", false
+	}
+	if strings.HasPrefix(source, "git@") {
+		return source, true
+	}
+	if strings.HasPrefix(source, "https://") || strings.HasPrefix(source, "http://") {
+		if strings.HasSuffix(source, ".git") {
+			return source, true
+		}
+		return strings.TrimRight(source, "/") + ".git", true
+	}
+	parts := strings.Split(source, "/")
+	if len(parts) == 2 && parts[0] != "" && parts[1] != "" {
+		return "https://github.com/" + source + ".git", true
+	}
+	return "", false
+}
+
+func sourceCacheDir(source string) string {
+	if root := os.Getenv("KNIT_SOURCE_CACHE_DIR"); root != "" {
+		return filepath.Join(root, cacheKeyPart(source))
+	}
+	root, err := os.UserCacheDir()
+	if err != nil {
+		root = os.TempDir()
+	}
+	return filepath.Join(root, "knit", "sources", cacheKeyPart(source))
+}
+
+func cacheKeyPart(s string) string {
+	sum := sha1.Sum([]byte(s))
+	return hex.EncodeToString(sum[:])
+}
+
+// loadSourceSkillMarkdown reads SKILL.md for source+name, cloning the repo
+// if no cached copy exists yet. Only git sources are supported.
+func (c *NpxClient) loadSourceSkillMarkdown(ctx context.Context, source, name string) (string, error) {
+	if strings.TrimSpace(source) == "" || strings.TrimSpace(name) == "" {
+		return "", errors.New("source and skill name required")
+	}
+	dir := sourceCacheDir(source)
+	if _, err := os.Stat(dir); errors.Is(err, os.ErrNotExist) {
+		url, ok := sourceGitURL(source)
+		if !ok {
+			return "", errors.New("source preview supports git sources only")
+		}
+		if _, err := c.run(ctx, "git", "clone", "--depth", "1", url, dir); err != nil {
+			return "", err
+		}
+	}
+
+	candidates := []string{
+		filepath.Join(dir, name, "SKILL.md"),
+		filepath.Join(dir, "skills", name, "SKILL.md"),
+		filepath.Join(dir, ".agents", "skills", name, "SKILL.md"),
+	}
+	for _, path := range candidates {
+		b, err := os.ReadFile(path)
+		if err == nil {
+			return string(b), nil
+		}
+	}
+	return "", fmt.Errorf("SKILL.md not found for %s in %s", name, source)
+}

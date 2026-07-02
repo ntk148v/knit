@@ -383,7 +383,7 @@ func (m *model) handleKey(k tea.KeyMsg) tea.Cmd {
 		m.mode = modeHelp
 		return nil
 	}
-	if m.handleGlobal(k) {
+	if m.handleAlwaysGlobal(k) {
 		return nil
 	}
 
@@ -405,6 +405,11 @@ func (m *model) handleKey(k tea.KeyMsg) tea.Cmd {
 		}
 	}
 
+	// Numeric tab shortcuts only fire when search is NOT focused.
+	if m.handleListGlobal(k) {
+		return nil
+	}
+
 	// Tab-specific handlers (navigation + shortcuts).
 	switch m.tab {
 	case TabInstalled:
@@ -419,9 +424,9 @@ func (m *model) handleKey(k tea.KeyMsg) tea.Cmd {
 	return nil
 }
 
-func (m *model) handleGlobal(k tea.KeyMsg) bool {
+func (m *model) handleAlwaysGlobal(k tea.KeyMsg) bool {
 	switch k.String() {
-	case "tab", "shift+tab", "1", "2", "3", "4":
+	case "tab", "shift+tab":
 		m.switchTab(k.String())
 		return true
 	case "esc":
@@ -429,6 +434,15 @@ func (m *model) handleGlobal(k tea.KeyMsg) bool {
 			m.clearSearch()
 			return true
 		}
+	}
+	return false
+}
+
+func (m *model) handleListGlobal(k tea.KeyMsg) bool {
+	switch k.String() {
+	case "1", "2", "3", "4":
+		m.switchTab(k.String())
+		return true
 	}
 	return false
 }
@@ -1348,13 +1362,22 @@ func (m *model) enrichSourceSkillForDetail(item skills.Skill) skills.Skill {
 		item.ID = item.Source + "/" + item.Name
 	}
 	for _, installed := range m.installed {
-		if installed.Name == item.Name && installed.Source == item.Source {
+		if sameSourceSkill(installed, item) {
 			return mergeDetailSkill(item, installed)
 		}
 	}
 	item.Status = skills.SkillStatus("available")
 	item.Scope = ""
 	return item
+}
+
+func sameSourceSkill(a, b skills.Skill) bool {
+	if !strings.EqualFold(strings.TrimSpace(a.Name), strings.TrimSpace(b.Name)) {
+		return false
+	}
+	as := strings.Trim(strings.ToLower(strings.TrimSpace(a.Source)), "/")
+	bs := strings.Trim(strings.ToLower(strings.TrimSpace(b.Source)), "/")
+	return as == "" || bs == "" || as == bs
 }
 
 func (m *model) sourceDetailView() string {
