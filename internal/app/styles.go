@@ -6,6 +6,7 @@ import "github.com/charmbracelet/lipgloss"
 // terminal background.
 type styles struct {
 	app         lipgloss.Style
+	appFrame    lipgloss.Style
 	logo        lipgloss.Style
 	tab         lipgloss.Style
 	activeTab   lipgloss.Style
@@ -43,6 +44,11 @@ func newStyles() styles {
 
 	return styles{
 		app:   lipgloss.NewStyle().Padding(0, 2),
+		appFrame: lipgloss.NewStyle().
+			Border(lipgloss.NormalBorder()).
+			BorderForeground(mutedColor).
+			Padding(0, 1).
+			Align(lipgloss.Center),
 		logo:  lipgloss.NewStyle().Bold(true).Background(accentColor).Foreground(selectedBg).Padding(0, 1),
 		tab:   lipgloss.NewStyle().Padding(0, 1).Foreground(mutedColor),
 		activeTab: lipgloss.NewStyle().Bold(true).Padding(0, 1).

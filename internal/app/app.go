@@ -128,8 +128,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
-		m.preview.Width = msg.Width - 4
-		m.preview.Height = max(5, msg.Height-14)
+		m.preview.Width = m.contentWidth() - 4
+		m.preview.Height = max(5, m.contentHeight()-10)
 		// Force preview re-layout when window resizes.
 		if m.previewContent != "" {
 			m.preview.SetContent(m.previewContent)
@@ -774,7 +774,19 @@ func (m *model) rootView() string {
 		b.WriteString("\n")
 		b.WriteString(m.style.dim.Render(m.message))
 	}
-	return m.style.app.Render(b.String())
+
+	content := m.style.appFrame.
+		Width(m.contentWidth()).
+		Height(m.contentHeight()).
+		Render(b.String())
+
+	return lipgloss.Place(
+		m.width,
+		m.height,
+		lipgloss.Center,
+		lipgloss.Center,
+		content,
+	)
 }
 
 func (m *model) header() string {
@@ -796,10 +808,10 @@ func (m *model) renderSearchRow() string {
 		value = "Search…"
 	}
 	cur := "  "
-	s := m.style.searchRow.Width(max(20, m.width-4))
+	s := m.style.searchRow.Width(max(20, m.contentWidth()-4))
 	if m.focus == focusSearch {
 		cur = "❯ "
-		s = m.style.searchRowFocused.Width(max(20, m.width-4))
+		s = m.style.searchRowFocused.Width(max(20, m.contentWidth()-4))
 	}
 	return s.Render(cur + "⌕ " + value) + "\n"
 }
@@ -832,7 +844,7 @@ func (m *model) renderInstalled() string {
 		if s.Enabled {
 			status = m.style.success.Render("✔ enabled")
 		}
-		b.WriteString(renderListLine(m.width, selected,
+		b.WriteString(renderListLine(m.contentWidth(), selected,
 			rowCell{Text: s.Name, Style: sty},
 			rowCell{Text: scopeBadge(m.style, s.Scope), Style: sty},
 			rowCell{Text: s.Source, Style: m.style.muted},
@@ -859,7 +871,7 @@ func (m *model) renderDiscover() string {
 		selected := i == m.discoverSel && m.focus == focusList
 		sty := rowStyle(m.style, selected)
 		installs := m.style.dim.Render(fmt.Sprintf("%d installs", s.Installs))
-		b.WriteString(renderListLine(m.width, selected,
+		b.WriteString(renderListLine(m.contentWidth(), selected,
 			rowCell{Text: s.Name, Style: sty},
 			rowCell{Text: s.Source, Style: m.style.muted},
 			rowCell{Text: installs, Style: m.style.dim}))
@@ -878,7 +890,7 @@ func (m *model) renderSources() string {
 	items := m.filteredSources()
 	// Row 1: Add source.
 	addSelected := m.sourcesSel == 1 && m.focus == focusList
-	b.WriteString(renderListLine(m.width, addSelected,
+	b.WriteString(renderListLine(m.contentWidth(), addSelected,
 		rowCell{Text: "+ Add source", Style: rowStyle(m.style, addSelected)}))
 	b.WriteString("\n")
 
@@ -895,7 +907,7 @@ func (m *model) renderSources() string {
 		}
 		selected := m.sourcesSel == i+2 && m.focus == focusList
 		sty := rowStyle(m.style, selected)
-		b.WriteString(renderListLine(m.width, selected,
+		b.WriteString(renderListLine(m.contentWidth(), selected,
 			rowCell{Text: s.Name, Width: 24, Style: sty},
 			rowCell{Text: s.Repo, Style: m.style.muted},
 			rowCell{Text: available, Width: 14, Style: m.style.dim},
@@ -919,7 +931,7 @@ func (m *model) renderLogs() string {
 		if l.Err != "" {
 			status = l.Err
 		}
-		b.WriteString(renderListLine(m.width, selected,
+		b.WriteString(renderListLine(m.contentWidth(), selected,
 			rowCell{Text: l.At.Format(time.Kitchen), Width: 10, Style: m.style.dim},
 			rowCell{Text: l.Action, Width: 16, Style: sty},
 			rowCell{Text: status, Style: m.style.muted}))
@@ -963,7 +975,7 @@ func (m *model) actionView() string {
 	}
 	var b strings.Builder
 	for i, a := range m.actions {
-		b.WriteString(renderListLine(m.width, i == m.actionSel,
+		b.WriteString(renderListLine(m.contentWidth(), i == m.actionSel,
 			rowCell{Text: a, Style: rowStyle(m.style, i == m.actionSel)}))
 		b.WriteString("\n")
 	}
@@ -995,7 +1007,7 @@ func (m *model) installScopeView() string {
 	var b strings.Builder
 	for _, item := range items {
 		selected := m.pendingInstallGlobal == item.global
-		b.WriteString(renderListLine(m.width, selected,
+		b.WriteString(renderListLine(m.contentWidth(), selected,
 			rowCell{Text: item.label, Style: rowStyle(m.style, selected)}))
 		b.WriteString("\n")
 	}
@@ -1039,7 +1051,7 @@ func (m *model) ensurePreviewContent(content string) {
 	} else if m.tab == TabDiscover {
 		term = m.discoverSearch
 	}
-	m.preview.SetContent(renderPreview(content, m.width-6, m.style, term))
+	m.preview.SetContent(renderPreview(content, m.contentWidth()-6, m.style, term))
 }
 
 func (m *model) openDetail(s skills.Skill) tea.Cmd {
@@ -1396,7 +1408,7 @@ func (m *model) sourceDetailView() string {
 	for i, p := range m.sourceSkills {
 		selected := i == m.sourceSkillSel
 		sty := rowStyle(m.style, selected)
-		b.WriteString(renderListLine(m.width, selected,
+		b.WriteString(renderListLine(m.contentWidth(), selected,
 			rowCell{Text: p.Name, Style: sty}))
 		b.WriteString("\n")
 	}
@@ -1594,6 +1606,14 @@ func errString(err error) string {
 func warn(s string) string { return s }
 
 func dim(s string) string { return lipgloss.NewStyle().Faint(true).Render(s) }
+
+func (m *model) contentWidth() int {
+	return max(20, m.width-8)
+}
+
+func (m *model) contentHeight() int {
+	return max(8, m.height-4)
+}
 
 func min(a, b int) int {
 	if a < b {

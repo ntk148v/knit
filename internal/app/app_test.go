@@ -533,7 +533,7 @@ func TestInstallFailureReturnsToListAndLogsError(t *testing.T) {
 
 func TestSourcesRowsUseConsistentCursorAndColumns(t *testing.T) {
 	m := newTestModel()
-	m.width = 100
+	m.width = 120
 	m.tab = TabSources
 	m.focus = focusList
 	m.sourcesSel = 2
