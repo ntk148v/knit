@@ -491,7 +491,7 @@ func TestMutationsUseNpxSkillsSoCliUpdatesLocks(t *testing.T) {
 		{"npx", "skills", "add", "owner/repo", "--skill", "uv", "-y", "-g"},
 		{"npx", "skills", "update", "caveman", "-y", "-p"},
 		{"npx", "skills", "update", "uv", "-y", "-g"},
-		{"npx", "skills", "remove", "caveman", "-y"},
+		{"npx", "skills", "remove", "caveman", "-y", "-p"},
 		{"npx", "skills", "remove", "uv", "-y", "-g"},
 	}
 	if !reflect.DeepEqual(r.calls, want) {

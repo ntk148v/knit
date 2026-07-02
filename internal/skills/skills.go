@@ -212,12 +212,6 @@ func findProjectLock(skills []Skill) map[string]string {
 	return nil
 }
 
-type lockSourceEntry struct {
-	Name   string `json:"name"`
-	Source string `json:"source"`
-	Repo   string `json:"repo"`
-}
-
 func (c *NpxClient) readLockSources(lockPath string) map[string]string {
 	data, err := os.ReadFile(lockPath)
 	if err != nil {
@@ -227,14 +221,40 @@ func (c *NpxClient) readLockSources(lockPath string) map[string]string {
 }
 
 func parseLockSources(data []byte) map[string]string {
-	var lock struct {
-		Skills []lockSourceEntry `json:"skills"`
+	var raw struct {
+		Skills json.RawMessage `json:"skills"`
 	}
-	if err := json.Unmarshal(data, &lock); err != nil {
+	if err := json.Unmarshal(data, &raw); err != nil {
 		return nil
 	}
-	m := make(map[string]string, len(lock.Skills))
-	for _, s := range lock.Skills {
+	m := make(map[string]string)
+
+	// Try map format: {"caveman": {"source":"...", "repo":"..."}}
+	var byName map[string]struct {
+		Source string `json:"source"`
+		Repo   string `json:"repo"`
+	}
+	if err := json.Unmarshal(raw.Skills, &byName); err == nil && byName != nil {
+		for name, entry := range byName {
+			if entry.Repo != "" {
+				m[name] = entry.Repo
+			} else if entry.Source != "" {
+				m[name] = entry.Source
+			}
+		}
+		return m
+	}
+
+	// Try array format: [{"name":"caveman", "source":"...", "repo":"..."}]
+	var list []struct {
+		Name   string `json:"name"`
+		Source string `json:"source"`
+		Repo   string `json:"repo"`
+	}
+	if err := json.Unmarshal(raw.Skills, &list); err != nil {
+		return nil
+	}
+	for _, s := range list {
 		if s.Repo != "" {
 			m[s.Name] = s.Repo
 		} else if s.Source != "" {
@@ -437,8 +457,10 @@ func (c *NpxClient) UpdateSkill(ctx context.Context, skill Skill) error {
 
 func (c *NpxClient) UninstallSkill(ctx context.Context, skill Skill) error {
 	args := []string{"skills", "remove", skill.Name, "-y"}
-	if skill.Scope == ScopeGlobal {
+	if skill.Scope == ScopeGlobal || skill.Scope == ScopeUser {
 		args = append(args, "-g")
+	} else if skill.Scope == ScopeProject {
+		args = append(args, "-p")
 	}
 	_, err := c.run(ctx, "npx", args...)
 	return err
@@ -556,7 +578,12 @@ func parseListAvailable(out, source string) []Skill {
 		indent := len(line) - len(strings.TrimLeft(line, " "))
 		switch {
 		case indent == 2:
+			// Skip section headings: "General", "Available Skills",
+			// or any Capitalized word that isn't a kebab-case skill name.
 			if trimmed == "General" || trimmed == "Available Skills" {
+				continue
+			}
+			if len(trimmed) > 0 && trimmed[0] >= 'A' && trimmed[0] <= 'Z' {
 				continue
 			}
 			res = append(res, Skill{

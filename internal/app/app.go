@@ -1429,6 +1429,9 @@ func removeCommand(item skills.Skill) string {
 	if item.Scope == skills.ScopeGlobal || item.Scope == skills.ScopeUser {
 		return cmd + " -g"
 	}
+	if item.Scope == skills.ScopeProject {
+		return cmd + " -p"
+	}
 	return cmd
 }
 

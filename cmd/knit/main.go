@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 
@@ -27,7 +27,6 @@ func parseArgs(args []string) (commandConfig, error) {
 		return commandConfig{}, fmt.Errorf("unknown command %q", args[0])
 	}
 	fs := flag.NewFlagSet("sync", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
 	lockFile := fs.String("f", "", "skills lock file")
 	global := fs.Bool("g", false, "install globally")
 	if err := fs.Parse(args[1:]); err != nil {
@@ -42,8 +41,11 @@ func parseArgs(args []string) (commandConfig, error) {
 func main() {
 	cfg, err := parseArgs(os.Args[1:])
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
+		if !errors.Is(err, flag.ErrHelp) {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
+		return
 	}
 
 	ctx := context.Background()

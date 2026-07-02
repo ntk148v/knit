@@ -288,6 +288,9 @@ func TestRemoveCommand(t *testing.T) {
 		t.Fatalf("global remove should have -g: %q", got)
 	}
 	got2 := removeCommand(skills.Skill{Name: "x", Scope: skills.ScopeProject})
+	if !strings.Contains(got2, "-p") {
+		t.Fatalf("project remove should have -p: %q", got2)
+	}
 	if strings.Contains(got2, "-g") {
 		t.Fatalf("project remove should not have -g: %q", got2)
 	}
