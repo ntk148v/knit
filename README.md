@@ -2,6 +2,8 @@
 
 <img src="assets/logo-transparent.png" alt="knit" width="320">
 
+# KNIT
+
 **A terminal UI agent skills.**
 
 [![CI](https://img.shields.io/github/actions/workflow/status/ntk148v/knit/ci.yml?branch=main&style=flat-square&label=CI&labelColor=0f172a&color=3dbbff)](https://github.com/ntk148v/knit/actions/workflows/ci.yml) [![Go Report Card](https://goreportcard.com/badge/github.com/ntk148v/knit?style=flat-square)](https://goreportcard.com/report/github.com/ntk148v/knit) [![Release](https://img.shields.io/github/v/release/ntk148v/knit?style=flat-square&labelColor=0f172a&color=ff79f2)](https://github.com/ntk148v/knit/releases/latest) [![Go](https://img.shields.io/github/go-mod/go-version/ntk148v/knit?style=flat-square&logo=go&logoColor=white&label=Go&labelColor=0f172a&color=3dbbff)](go.mod) [![License](https://img.shields.io/badge/license-Apache-b253f5?style=flat-square&labelColor=0f172a)](LICENSE) [![Stars](https://img.shields.io/github/stars/ntk148v/knit?style=flat-square&labelColor=0f172a&color=556bf4)](https://github.com/ntk148v/knit/stargazers)
@@ -67,25 +69,25 @@ knit
 
 ### Common keys
 
-| Key                 | Action                                         |
-| ------------------- | ---------------------------------------------- |
-| `Tab` / `Shift+Tab` | Switch tabs.                                   |
-| `1`-`4`             | Jump to a tab.                                 |
-| `/`                 | Focus search.                                  |
-| `j`/`k` or arrows   | Move selection.                                |
-| `Enter`             | View selected item or confirm selected action. |
-| `Esc`               | Go back, close overlay, or clear search.       |
-| `?`                 | Show help for the current tab.                 |
-| `q` / `Ctrl+C`      | Quit.                                          |
+| Key                                   | Action                                         |
+| ------------------------------------- | ---------------------------------------------- |
+| <kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> | Switch tabs.                                   |
+| <kbd>1</kbd>-<kbd>4</kbd>             | Jump to a tab.                                 |
+| <kbd>/</kbd>                          | Focus search.                                  |
+| <kbd>j</kbd>/<kbd>k</kbd> or arrows   | Move selection.                                |
+| <kbd>Enter</kbd>                      | View selected item or confirm selected action. |
+| <kbd>Esc</kbd>                        | Go back, close overlay, or clear search.       |
+| <kbd>?</kbd>                          | Show help for the current tab.                 |
+| <kbd>q</kbd> / <kbd>Ctrl+C</kbd>      | Quit.                                          |
 
 ### Tab actions
 
-| Tab       | Keys                                      |
-| --------- | ----------------------------------------- |
-| Installed | `u` update, `d` uninstall, `c` actions.   |
-| Discover  | `i` install, `s` add source, `c` actions. |
-| Sources   | `a` add, `u` update, `d` remove.          |
-| Logs      | `Enter` detail, `c` clear.                |
+| Tab       | Keys                                                                 |
+| --------- | -------------------------------------------------------------------- |
+| Installed | <kbd>u</kbd> update, <kbd>d</kbd> uninstall, <kbd>c</kbd> actions.   |
+| Discover  | <kbd>i</kbd> install, <kbd>s</kbd> add source, <kbd>c</kbd> actions. |
+| Sources   | <kbd>a</kbd> add, <kbd>u</kbd> update, <kbd>d</kbd> remove.          |
+| Logs      | <kbd>Enter</kbd> detail, <kbd>c</kbd> clear.                         |
 
 ## Sync mode
 
