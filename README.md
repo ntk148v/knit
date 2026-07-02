@@ -2,16 +2,23 @@
 
 `knit` is a keyboard-first terminal UI for managing [`npx skills`](https://github.com/vercel-labs/skills) skills.
 
-It wraps the skills CLI with a small Bubble Tea interface so you can list installed skills, discover new ones, manage sources, and keep a session log without remembering every command.
+It keeps the upstream CLI as the source of truth, then adds the part terminals are good at: fast browsing, focused detail views, visible actions, and no command memorization.
+
+## Why knit?
+
+`npx skills` is already good. It is simple, scriptable, and the right tool when you know the exact command to run.
+
+`knit` exists for the other half of the workflow: browsing installed skills, discovering new ones, checking source metadata, and managing changes without repeatedly typing long commands. A TUI makes that loop faster because the current state stays on screen.
 
 ## Features
 
 - Browse project and global skills in one place.
 - Search installed skills, discovered skills, and sources.
+- Inspect focused skill and source detail views with `Esc` back navigation.
 - Install, update, uninstall, and prune skills from the TUI.
 - Add, update, remove, and inspect skill sources.
 - Sync skills from a project or global skills lock file.
-- Review action logs for commands run during the session.
+- Review session action logs, including command output details.
 
 ## Requirements
 
@@ -70,12 +77,14 @@ knit
 | Sources   | `a` add, `u` update, `d` remove.          |
 | Logs      | `Enter` detail, `c` clear.                |
 
-## Lock-file sync
+## Sync mode
 
 `knit` uses the upstream skills lock files directly:
 
-- Project: `./skills-lock.json`
-- Global: `~/.agents/.skill-lock.json`
+| Scope   | Lock file                    |
+| ------- | ---------------------------- |
+| Project | `./skills-lock.json`         |
+| Global  | `~/.agents/.skill-lock.json` |
 
 Sync a lock file into the current project:
 
@@ -89,8 +98,7 @@ Sync a lock file globally:
 knit sync -f ~/.agents/.skill-lock.json -g
 ```
 
-Until [upstream skills sync](https://github.com/vercel-labs/skills/issues/283) is fixed,
-`knit` reads the lock file and installs each skill with `npx skills add <source> --skill <name> -y`.
+Until [upstream skills sync](https://github.com/vercel-labs/skills/issues/283) is implemented, `knit sync` is the boring bridge: it reads the lock file and installs each entry with `npx skills add <source> --skill <name> -y`.
 
 ## Development
 
@@ -102,8 +110,7 @@ go run ./cmd/knit
 Project layout:
 
 - `cmd/knit` — CLI entrypoint.
-- `internal/app` — Bubble Tea model, views, key handling.
-- `internal/skills` — `npx skills` adapter and parsers.
+- `internal/app` — Bubble Tea model, views, and key handling.
 - `internal/skills` — `npx skills` adapter, parsers, and lock-file reader.
 
 Keep changes boring: prefer small UI/state updates, no extra dependencies unless the standard library and current Charm stack cannot do it.
