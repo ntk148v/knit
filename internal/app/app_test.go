@@ -533,30 +533,40 @@ func TestInstallFailureReturnsToListAndLogsError(t *testing.T) {
 
 func TestSourcesRowsUseConsistentCursorAndColumns(t *testing.T) {
 	m := newTestModel()
-	m.width = 80
+	m.width = 100
 	m.tab = TabSources
 	m.focus = focusList
 	m.sourcesSel = 2
-	m.sources = []skills.Source{{Name: "ntk148v/skills", Repo: "github.com/ntk148v/skills"}}
+	m.sources = []skills.Source{{Name: "ntk148v/skills", Repo: "github.com/ntk148v/skills", Available: 12, Installed: 3, RawUpdated: "unknown"}}
+
 	out := m.renderSources()
-	if !strings.Contains(out, "❯") || !strings.Contains(out, "ntk148v/skills") {
-		t.Fatalf("source row missing cursor/name:\n%s", out)
+	if !strings.Contains(out, "❯ ntk148v/skills") {
+		t.Fatalf("source row missing selected name:\n%s", out)
 	}
-	if strings.Contains(out, "\n\n\n") {
-		t.Fatalf("source row has messy blank spacing:\n%s", out)
+	if !strings.Contains(out, "github.com/ntk148v/skills") || !strings.Contains(out, "12 available") || !strings.Contains(out, "3 installed") {
+		t.Fatalf("source row missing columns:\n%s", out)
+	}
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		if strings.Contains(line, "github.com/ntk148v/skills") && strings.HasPrefix(strings.TrimSpace(line), "github.com") {
+			t.Fatalf("repo rendered on separate meta line, want columns:\n%s", out)
+		}
 	}
 }
 
 func TestLogsRowsUseConsistentCursorAndColumns(t *testing.T) {
 	m := newTestModel()
-	m.width = 80
+	m.width = 100
 	m.tab = TabLogs
 	m.focus = focusList
 	m.logsSel = 0
-	m.logs = []skills.LogEntry{{Action: "install", Command: "npx skills add repo --skill demo -y", Output: "ok"}}
+	m.logs = []skills.LogEntry{{At: time.Date(2026, 7, 2, 9, 30, 0, 0, time.Local), Action: "install", Command: "npx skills add repo --skill demo -y", Output: "ok"}}
+
 	out := m.renderLogs()
 	if !strings.Contains(out, "❯") || !strings.Contains(out, "install") || !strings.Contains(out, "npx skills") {
 		t.Fatalf("log row missing expected content:\n%s", out)
+	}
+	if strings.Count(out, "install") != 1 {
+		t.Fatalf("log row should be single-line, got:\n%s", out)
 	}
 }
 

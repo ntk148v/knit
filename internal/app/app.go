@@ -866,22 +866,19 @@ func (m *model) renderSources() string {
 		} else if s.RawUpdated != "" {
 			updated = s.RawUpdated
 		}
-		skillsLabel := fmt.Sprintf("%d available", s.Available)
-		if s.Available <= 1 {
-			skillsLabel = "skills unknown"
-		}
-		meta := []string{
-			s.Repo,
-			skillsLabel,
-			fmt.Sprintf("%d installed", s.Installed),
-			"Updated " + updated,
+		available := "skills unknown"
+		if s.Available > 0 {
+			available = fmt.Sprintf("%d available", s.Available)
 		}
 		selected := m.sourcesSel == i+2 && m.focus == focusList
-		b.WriteString(renderBlockRow(m.width, selected,
-			s.Name[:min(len(s.Name), m.width-4)],
-			meta,
-			"",
-			rowStyle(m.style, selected), m.style.dim))
+		sty := rowStyle(m.style, selected)
+		b.WriteString(renderListLine(m.width, selected,
+			rowCell{Text: s.Name, Width: 24, Style: sty},
+			rowCell{Text: s.Repo, Style: m.style.muted},
+			rowCell{Text: available, Width: 14, Style: m.style.dim},
+			rowCell{Text: fmt.Sprintf("%d installed", s.Installed), Width: 14, Style: m.style.dim},
+			rowCell{Text: "Updated " + updated, Width: 18, Style: m.style.dim}))
+		b.WriteString("\n")
 	}
 	return b.String()
 }
@@ -893,16 +890,17 @@ func (m *model) renderLogs() string {
 		return b.String() + m.style.dim.Render("no logs")
 	}
 	for i, l := range m.logs {
-		meta := []string{l.At.Format(time.Kitchen), l.Action, l.Command}
-		if l.Err != "" {
-			meta = append(meta, m.style.warning.Render(l.Err))
-		}
 		selected := i == m.logsSel && m.focus == focusList
-		b.WriteString(renderBlockRow(m.width, selected,
-			l.Action,
-			meta,
-			"",
-			rowStyle(m.style, selected), m.style.dim))
+		sty := rowStyle(m.style, selected)
+		status := l.Command
+		if l.Err != "" {
+			status = l.Err
+		}
+		b.WriteString(renderListLine(m.width, selected,
+			rowCell{Text: l.At.Format(time.Kitchen), Width: 10, Style: m.style.dim},
+			rowCell{Text: l.Action, Width: 16, Style: sty},
+			rowCell{Text: status, Style: m.style.muted}))
+		b.WriteString("\n")
 	}
 	return b.String()
 }
