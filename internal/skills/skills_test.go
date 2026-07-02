@@ -325,22 +325,31 @@ func TestSkillDetailCachesResult(t *testing.T) {
 }
 
 func TestParseListAvailableCurrentGroupedOutput(t *testing.T) {
+	// Real npx skills add --list output format (with │ prefixes).
 	out := strings.Join([]string{
-		"\u25c6  Available Skills",
-		"",
-		"Utilities",
-		"  grill-with-doc",
-		"    Interview the user using documentation context.",
-		"  code-reviewer",
-		"    Review code for correctness and maintainability.",
-		"",
-		"\u25c6  Use --skill <name> to install specific skills",
+		"◇  Available Skills",
+		"Agent Skills Collection",
+		"│",
+		"│    grill-with-doc",
+		"│",
+		"│      Interview the user using documentation context.",
+		"│",
+		"│    code-reviewer",
+		"│",
+		"│      Review code for correctness and maintainability.",
+		"│",
+		"General",
+		"│",
+		"│    repo-analyzer",
+		"│",
+		"└  Use --skill <name> to install specific skills",
 	}, "\n")
 
 	got := parseListAvailable(out, "ntk148v/skills")
 	want := []Skill{
 		{Name: "grill-with-doc", Source: "ntk148v/skills", ID: "ntk148v/skills/grill-with-doc"},
 		{Name: "code-reviewer", Source: "ntk148v/skills", ID: "ntk148v/skills/code-reviewer"},
+		{Name: "repo-analyzer", Source: "ntk148v/skills", ID: "ntk148v/skills/repo-analyzer"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("parsed skills mismatch\nwant %#v\n got %#v", want, got)
@@ -490,28 +499,32 @@ func TestMutationsUseNpxSkillsSoCliUpdatesLocks(t *testing.T) {
 }
 
 func TestParseListAvailableFiltersBoxDrawingAndHeaders(t *testing.T) {
-	// Mimics the actual npx skills --list output with box frames, blank lines,
-	// prompt characters, header labels, and real skill names.
+	// Full realistic output: boxes, prompts, blank lines, section headers, real names.
 	out := strings.Join([]string{
-		"◆  Source verified!",
-		"",
-		"  Available Skills",
-		"  ───────────────────",
-		"",
-		"  ┌───────── SKILLS ─────────┐",
-		"  │                                         │",
-		"  └───────────────────────────────┘",
-		"",
-		"  General",
-		"    caveman",
-		"    handoff",
-		"  Utilities",
-		"    code-reviewer",
-		"    conventional-commits",
-		"  Engineering",
-		"    repo-analyzer",
-		"",
-		"◆  Use --skill <name> to install specific skills",
+		"◇  Available Skills",
+		"Agent Skills Collection",
+		"│",
+		"│    caveman",
+		"│",
+		"│      Ultra-compressed communication mode.",
+		"│",
+		"│    handoff",
+		"│",
+		"│      Compact the current conversation.",
+		"│",
+		"General",
+		"│",
+		"│    code-reviewer",
+		"│",
+		"│      Review code.",
+		"│",
+		"│    conventional-commits",
+		"│",
+		"│      Use when creating git commits.",
+		"│",
+		"│    repo-analyzer",
+		"│",
+		"└  Use --skill <name> to install specific skills",
 	}, "\n")
 
 	got := parseListAvailable(out, "ntk148v/skills")
@@ -528,10 +541,25 @@ func TestParseListAvailableFiltersBoxDrawingAndHeaders(t *testing.T) {
 }
 
 func TestParseListAvailableDeduplicates(t *testing.T) {
-	out := "  caveman\n  caveman\n  handoff\n"
+	out := "│    caveman\n│    caveman\n│    handoff\n"
 	got := parseListAvailable(out, "ntk148v/skills")
 	if len(got) != 2 || got[0].Name != "caveman" || got[1].Name != "handoff" {
 		t.Fatalf("expected 2 deduplicated skills, got %#v", got)
+	}
+}
+
+func TestParseListAvailableEmptyWhenNoSkillNames(t *testing.T) {
+	// Lines with box-drawing chars only, no real skill names.
+	out := strings.Join([]string{
+		"┌─────────────────┐",
+		"│                                 │",
+		"└───────────────────────┘",
+		"◇  Some message",
+		"└  Use --skill <name> to install",
+	}, "\n")
+	got := parseListAvailable(out, "ntk148v/skills")
+	if len(got) != 0 {
+		t.Fatalf("expected 0 skills from decorative-only output, got %d: %#v", len(got), got)
 	}
 }
 

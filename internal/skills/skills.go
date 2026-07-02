@@ -15,7 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
+	"unicode/utf8"
 )
 
 type Scope string
@@ -585,12 +585,29 @@ func isSourceSkillName(s string) bool {
 	return true
 }
 
+// stripBoxDrawing removes leading box-drawing and prompt characters from a line.
+func stripBoxDrawing(s string) string {
+	for len(s) > 0 {
+		r, n := utf8.DecodeRuneInString(s)
+		switch r {
+		case '\u2502', '\u2514', '\u250C', '\u251C', '\u2510', '\u2524', '\u2518', '\u2500',
+			'\u25C6', '\u25C7', '\u2714', '\u2716':
+			s = s[n:]
+		default:
+			return s
+		}
+	}
+	return s
+}
+
 func parseListAvailable(out, source string) []Skill {
 	var res []Skill
 	seen := map[string]bool{}
 	scanner := bufio.NewScanner(strings.NewReader(stripANSI(out)))
 	for scanner.Scan() {
 		trimmed := strings.TrimSpace(scanner.Text())
+		trimmed = stripBoxDrawing(trimmed)
+		trimmed = strings.TrimSpace(trimmed)
 		if trimmed == "" {
 			continue
 		}
