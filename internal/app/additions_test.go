@@ -288,6 +288,22 @@ func TestSourceDetailInstalledSkillMetadataUsesInstalledScope(t *testing.T) {
 	}
 }
 
+func TestInstalledDetailEscStillReturnsToNormalMode(t *testing.T) {
+	m := newTestModel()
+	m.mode = modeNormal
+	m.tab = TabInstalled
+	m.installed = []skills.Skill{{Name: "caveman", Source: "ntk148v/skills", Scope: skills.ScopeProject, Status: skills.SkillStatusEnabled}}
+
+	m.openDetail(m.installed[0])
+	if m.mode != modeDetail {
+		t.Fatalf("expected modeDetail, got %d", m.mode)
+	}
+	m.handleKey(tea.KeyMsg{Type: tea.KeyEsc})
+	if m.mode != modeNormal {
+		t.Fatalf("expected modeNormal after Esc from installed detail, got %d", m.mode)
+	}
+}
+
 func TestInstalledRowsShowScopeBadges(t *testing.T) {
 	m := newTestModel()
 	m.installed = []skills.Skill{

@@ -41,12 +41,12 @@ knit
 
 `knit` opens with four tabs:
 
-| Tab       | Purpose                                    |
-| --------- | ------------------------------------------ |
-| Installed | View and manage installed skills.          |
-| Discover  | Search available skills and install them.  |
-| Sources   | Manage skill sources.                       |
-| Logs      | Inspect actions run in this session.       |
+| Tab       | Purpose                                   |
+| --------- | ----------------------------------------- |
+| Installed | View and manage installed skills.         |
+| Discover  | Search available skills and install them. |
+| Sources   | Manage skill sources.                     |
+| Logs      | Inspect actions run in this session.      |
 
 ### Common keys
 
@@ -63,12 +63,12 @@ knit
 
 ### Tab actions
 
-| Tab       | Keys                                                        |
-| --------- | ----------------------------------------------------------- |
-| Installed | `u` update, `d` uninstall, `c` actions.                     |
-| Discover  | `i` install, `s` add source, `c` actions.                   |
-| Sources   | `a` add, `u` update, `d` remove.                            |
-| Logs      | `Enter` detail, `c` clear.                                  |
+| Tab       | Keys                                      |
+| --------- | ----------------------------------------- |
+| Installed | `u` update, `d` uninstall, `c` actions.   |
+| Discover  | `i` install, `s` add source, `c` actions. |
+| Sources   | `a` add, `u` update, `d` remove.          |
+| Logs      | `Enter` detail, `c` clear.                |
 
 ## Lock-file sync
 
