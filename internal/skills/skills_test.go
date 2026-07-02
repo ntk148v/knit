@@ -407,6 +407,46 @@ func TestLoadLockFileArrayShape(t *testing.T) {
 	}
 }
 
+func TestSyncFromLockInstallsEachSkillWithNpxAdd(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "skills-lock.json")
+	data := `{"version":1,"skills":{"caveman":{"source":"ntk148v/skills"},"handoff":{"source":"ntk148v/skills"}}}`
+	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r := &recordingRunner{}
+	c := NewNpxClientWithRunner(r)
+
+	if err := c.SyncFromLock(context.Background(), path, false); err != nil {
+		t.Fatal(err)
+	}
+	want := [][]string{
+		{"npx", "skills", "add", "ntk148v/skills", "--skill", "caveman", "-y"},
+		{"npx", "skills", "add", "ntk148v/skills", "--skill", "handoff", "-y"},
+	}
+	if !reflect.DeepEqual(r.calls, want) {
+		t.Fatalf("calls mismatch\nwant %#v\n got %#v", want, r.calls)
+	}
+}
+
+func TestSyncFromLockGlobalAddsGlobalFlag(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "skills-lock.json")
+	if err := os.WriteFile(path, []byte(`{"skills":{"uv":{"source":"owner/repo"}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r := &recordingRunner{}
+	c := NewNpxClientWithRunner(r)
+
+	if err := c.SyncFromLock(context.Background(), path, true); err != nil {
+		t.Fatal(err)
+	}
+	got := strings.Join(r.calls[0], " ")
+	if !strings.Contains(got, " -g") {
+		t.Fatalf("global sync missing -g: %#v", r.calls[0])
+	}
+}
+
 func TestInstallSkillScopeFlags(t *testing.T) {
 	r := &recordingRunner{out: []byte("[]")}
 	c := NewNpxClientWithRunner(r)

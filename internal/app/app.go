@@ -12,7 +12,6 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/ntk148v/knit/internal/config"
 	"github.com/ntk148v/knit/internal/skills"
 )
 
@@ -166,13 +165,6 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case sourceSkillsLoadedMsg:
 		m.applySourceSkills(msg)
 		return m, nil
-	case syncPreviewMsg:
-		if msg.err != nil {
-			m.message = msg.err.Error()
-			return m, nil
-		}
-		m.configureSync(msg.snap)
-		return m, nil
 	case addSourceDoneMsg:
 		if msg.err != nil {
 			m.message = msg.err.Error()
@@ -267,10 +259,7 @@ func (m *model) handleKey(k tea.KeyMsg) tea.Cmd {
 				if err != nil {
 					return addSourceDoneMsg{err: err}
 				}
-				if err := m.saveSourceToConfig(val, val); err != nil {
-					return addSourceDoneMsg{err: err}
-				}
-				return addSourceDoneMsg{message: "Added source " + val, source: val}
+				return addSourceDoneMsg{message: "Loaded source " + val, source: val}
 			}
 		}
 		var cmd tea.Cmd
@@ -566,10 +555,9 @@ func (m *model) handleSources(k tea.KeyMsg) tea.Cmd {
 		m.mode = modeAddSource
 		m.addSourceIn.Focus()
 		return nil
-	case "D":
-		return m.openDump()
 	case "S":
-		return m.openSync()
+		m.message = "Use: knit sync -f <skills-lock.json> [-g]"
+		return nil
 	case "j", "down":
 		if m.focus == focusSearch {
 			m.sourcesSel = 1
@@ -593,12 +581,7 @@ func (m *model) handleSources(k tea.KeyMsg) tea.Cmd {
 			return nil
 		}
 		return m.runAction("update-source", "refresh source", "Updated source "+s.Name,
-			func() error {
-				if err := m.client.UpdateSource(m.ctx, s.Name); err != nil {
-					return err
-				}
-				return m.saveSourceToConfig(s.Name, s.Repo)
-			},
+			func() error { return m.client.UpdateSource(m.ctx, s.Name) },
 			m.refreshSourcesCmd())
 	case "d":
 		s := m.currentSource()
@@ -608,11 +591,8 @@ func (m *model) handleSources(k tea.KeyMsg) tea.Cmd {
 		m.mode = modeConfirm
 		m.confirm = "Remove source " + s.Name + "?"
 		m.confirmDo = func() tea.Cmd {
-			return m.runAction("remove-source", "remove source from ~/.config/knit/knit.json", "Removed source "+s.Name,
-				func() error {
-					_ = m.client.RemoveSource(m.ctx, s.Name)
-					return m.removeSourceFromConfig(s.Name)
-				},
+			return m.runAction("remove-source", "Removed source "+s.Name, "Removed source "+s.Name,
+				func() error { return m.client.RemoveSource(m.ctx, s.Name) },
 				m.refreshSourcesCmd())
 		}
 	case "enter":
@@ -1162,9 +1142,7 @@ func (m *model) refreshSourcesCmd() tea.Cmd {
 		if err != nil && lockItems == nil {
 			return loadedMsg{tab: TabSources, err: err}
 		}
-		// Merge with config-persisted sources.
-		items := m.mergeConfigSources(lockItems)
-		return loadedMsg{tab: TabSources, sources: items}
+		return loadedMsg{tab: TabSources, sources: lockItems}
 	}
 }
 
@@ -1248,32 +1226,6 @@ func (m *model) currentSource() skills.Source {
 	return items[idx]
 }
 
-func (m *model) openDump() tea.Cmd {
-	return func() tea.Msg {
-		snap, err := m.client.Dump(m.ctx)
-		if err != nil {
-			return confirmResultMsg{err: err}
-		}
-		path, err := config.Save(snap)
-		return actionResultMsg{action: "dump", command: "dump snapshot", message: "saved snapshot to " + path, err: err}
-	}
-}
-
-func (m *model) openSync() tea.Cmd {
-	return func() tea.Msg {
-		snap, err := config.Load()
-		return syncPreviewMsg{snap: snap, err: err}
-	}
-}
-
-func (m *model) configureSync(snap skills.Snapshot) {
-	m.mode = modeConfirm
-	m.confirm = fmt.Sprintf("Sync %d sources and %d skills?", len(snap.Sources), len(snap.Skills))
-	m.confirmDo = func() tea.Cmd {
-		return m.runAction("sync", "sync snapshot", "Synced", func() error { return m.client.Sync(m.ctx, snap) }, tea.Batch(m.refreshInstalledCmd(), m.refreshSourcesCmd()))
-	}
-}
-
 // ─── Source detail mode ────────────────────────────────────────────
 
 func (m *model) openSourceDetail(s skills.Source) tea.Cmd {
@@ -1327,10 +1279,7 @@ func (m *model) handleSourceDetailKey(k tea.KeyMsg) tea.Cmd {
 		m.confirm = "Remove source " + m.sourceDetail.Name + "?"
 		m.confirmDo = func() tea.Cmd {
 			return m.runAction("remove-source", "remove source from ~/.config/knit/knit.json", "Removed source "+m.sourceDetail.Name,
-				func() error {
-					_ = m.client.RemoveSource(m.ctx, m.sourceDetail.Name)
-					return m.removeSourceFromConfig(m.sourceDetail.Name)
-				},
+				func() error { return m.client.RemoveSource(m.ctx, m.sourceDetail.Name) },
 				m.refreshSourcesCmd())
 		}
 	}
@@ -1371,76 +1320,6 @@ func (m *model) sourceDetailView() string {
 	return m.frame("Source Detail", b.String())
 }
 
-// ─── Config-backed source helpers ──────────────────────────────────
-
-// mergeConfigSources enriches lock-based sources with those persisted in
-// ~/.config/knit/knit.json. Sources found only in config are added with
-// zero installed count; existing lock sources preserve their installed count.
-func (m *model) mergeConfigSources(lockItems []skills.Source) []skills.Source {
-	snap, err := config.Load()
-	if err != nil {
-		return lockItems
-	}
-	if len(snap.Sources) == 0 {
-		return lockItems
-	}
-
-	lockByName := map[string]skills.Source{}
-	for _, s := range lockItems {
-		lockByName[s.Name] = s
-	}
-
-	seen := map[string]bool{}
-	out := make([]skills.Source, 0, len(snap.Sources))
-	for name, repo := range snap.Sources {
-		seen[name] = true
-		if ls, ok := lockByName[name]; ok {
-			out = append(out, skills.Source{
-				Name:      name,
-				Repo:      repo,
-				Installed: ls.Installed,
-				Available: max(ls.Available, 1),
-			})
-		} else {
-			out = append(out, skills.Source{
-				Name:      name,
-				Repo:      repo,
-				Installed: 0,
-				Available: 1,
-			})
-		}
-	}
-	for _, s := range lockItems {
-		if !seen[s.Name] {
-			out = append(out, s)
-		}
-	}
-	return out
-}
-
-func (m *model) saveSourceToConfig(name, repo string) error {
-	snap, err := config.Load()
-	if err != nil {
-		snap = skills.Snapshot{Sources: map[string]string{}}
-	}
-	if snap.Sources == nil {
-		snap.Sources = map[string]string{}
-	}
-	snap.Sources[name] = repo
-	_, err = config.Save(snap)
-	return err
-}
-
-func (m *model) removeSourceFromConfig(name string) error {
-	snap, err := config.Load()
-	if err != nil {
-		return nil
-	}
-	delete(snap.Sources, name)
-	_, err = config.Save(snap)
-	return err
-}
-
 func detailActions(tab Tab) []string {
 	if tab == TabInstalled {
 		return []string{"Update", "Uninstall", "Back to plugin list"}
@@ -1449,11 +1328,11 @@ func detailActions(tab Tab) []string {
 }
 
 func helpBody(tab Tab) string {
-	base := []string{"Tab/Shift+Tab switch tabs", "1-4 jump tabs", "?/Esc help", "q/Ctrl+C quit", "/ search", "D dump", "S sync"}
+	base := []string{"Tab/Shift+Tab switch tabs", "1-4 jump tabs", "?/Esc help", "q/Ctrl+C quit", "/ search"}
 	specific := map[Tab][]string{
 		TabInstalled: {"j/k move", "u update", "d uninstall", "c actions"},
 		TabDiscover:  {"j/k move", "i install", "s add source", "c actions"},
-		TabSources:   {"a add", "D dump", "S sync", "u update", "d remove"},
+		TabSources:   {"a add", "u update", "d remove"},
 		TabLogs:      {"c clear"},
 	}[tab]
 	return strings.Join(append(append(base, ""), specific...), "\n")
@@ -1592,10 +1471,7 @@ type actionResultMsg struct {
 	nextTab                         Tab
 	hasNextTab                      bool
 }
-type syncPreviewMsg struct {
-	snap skills.Snapshot
-	err  error
-}
+
 type confirmResultMsg struct {
 	message string
 	err     error

@@ -39,8 +39,7 @@ func (f fakeClient) ListSourceSkills(context.Context, string) ([]skills.Skill, e
 	return nil, nil
 }
 func (f fakeClient) PruneLocks(context.Context) error              { return nil }
-func (f fakeClient) Dump(context.Context) (skills.Snapshot, error) { return skills.Snapshot{}, nil }
-func (f fakeClient) Sync(context.Context, skills.Snapshot) error   { return nil }
+func (f fakeClient) SyncFromLock(context.Context, string, bool) error { return nil }
 
 // newTestModel creates a model with a fake client, sized 80x24.
 func newTestModel() *model {
