@@ -561,6 +561,10 @@ func (c *NpxClient) ListSourceSkills(ctx context.Context, source string) ([]Skil
 	return parseListAvailable(string(out), source), nil
 }
 
+func looksLikeRealContent(s string) bool {
+	return strings.ContainsAny(s, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+}
+
 func parseListAvailable(out, source string) []Skill {
 	var res []Skill
 	scanner := bufio.NewScanner(strings.NewReader(stripANSI(out)))
@@ -573,6 +577,10 @@ func parseListAvailable(out, source string) []Skill {
 		// Skip bullet/decoration lines from @clack/prompts.
 		if strings.HasPrefix(trimmed, "◆") || strings.HasPrefix(trimmed, "◇") ||
 			strings.HasPrefix(trimmed, "✔") || strings.HasPrefix(trimmed, "✖") {
+			continue
+		}
+		// Skip decorative borders and lines with no real content (dashes, box-drawing, etc.).
+		if !looksLikeRealContent(trimmed) {
 			continue
 		}
 		indent := len(line) - len(strings.TrimLeft(line, " "))
