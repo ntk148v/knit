@@ -77,6 +77,17 @@ func testGapAtMost(t *testing.T, line, left, right string, maxGap int) {
 	}
 }
 
+func testStartsAfter(t *testing.T, line, needle string, minIndex int) {
+	t.Helper()
+	idx := strings.Index(line, needle)
+	if idx < 0 {
+		t.Fatalf("missing %q in line:\n%s", needle, line)
+	}
+	if idx < minIndex {
+		t.Fatalf("%q starts at column %d, want >= %d:\n%s", needle, idx, minIndex, line)
+	}
+}
+
 func TestModelTabSwitchAndSearchClear(t *testing.T) {
 	m := New(fakeClient{
 		installed: []skills.Skill{{Name: "caveman", Source: "caveman", Enabled: true}},
@@ -119,7 +130,7 @@ func TestInstalledRootViewRowsAreLeftAlignedInFrame(t *testing.T) {
 	}
 }
 
-func TestInstalledRowsUseCompactLeftColumns(t *testing.T) {
+func TestInstalledRowsUseFullWidthLikeSources(t *testing.T) {
 	m := newTestModel()
 	m.width = 180
 	m.tab = TabInstalled
@@ -127,12 +138,12 @@ func TestInstalledRowsUseCompactLeftColumns(t *testing.T) {
 	m.installed = []skills.Skill{{Name: "caveman", Source: "ntk148v/skills", Scope: skills.ScopeProject, Enabled: true}}
 
 	line := testLineContaining(t, m.renderInstalled(), "caveman")
-	testGapAtMost(t, line, "caveman", "P", 18)
+	testGapAtMost(t, line, "caveman", "P", 24)
 	testGapAtMost(t, line, "P", "ntk148v/skills", 8)
-	testGapAtMost(t, line, "ntk148v/skills", "✔ enabled", 24)
+	testStartsAfter(t, line, "✔ enabled", 130)
 }
 
-func TestDiscoverRowsUseCompactLeftColumns(t *testing.T) {
+func TestDiscoverRowsUseFullWidthLikeSources(t *testing.T) {
 	m := newTestModel()
 	m.width = 180
 	m.tab = TabDiscover
@@ -140,8 +151,8 @@ func TestDiscoverRowsUseCompactLeftColumns(t *testing.T) {
 	m.discover = []skills.Skill{{Name: "caveman", Source: "ntk148v/skills", Installs: 42}}
 
 	line := testLineContaining(t, m.renderDiscover(), "caveman")
-	testGapAtMost(t, line, "caveman", "ntk148v/skills", 18)
-	testGapAtMost(t, line, "ntk148v/skills", "42 installs", 24)
+	testGapAtMost(t, line, "caveman", "ntk148v/skills", 24)
+	testStartsAfter(t, line, "42 installs", 130)
 }
 
 // ─── Task 1: Style smoke tests ───────────────────────────────────────
