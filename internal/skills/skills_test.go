@@ -359,6 +359,54 @@ func TestParseListAvailableCurrentGroupedOutput(t *testing.T) {
 	}
 }
 
+func TestLoadLockFileMapShape(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "skills-lock.json")
+	data := `{
+		"version": 1,
+		"skills": {
+			"caveman": {
+				"source": "ntk148v/skills",
+				"sourceType": "github",
+				"skillPath": "skills/caveman/SKILL.md",
+				"computedHash": "abc"
+			}
+		}
+	}`
+	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	lock, err := LoadLockFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lock.Version != 1 || len(lock.Skills) != 1 {
+		t.Fatalf("bad lock: %#v", lock)
+	}
+	got := lock.Skills[0]
+	if got.Name != "caveman" || got.Source != "ntk148v/skills" || got.SkillPath != "skills/caveman/SKILL.md" {
+		t.Fatalf("bad skill: %#v", got)
+	}
+}
+
+func TestLoadLockFileArrayShape(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "skills-lock.json")
+	data := `{"version":1,"skills":[{"name":"handoff","source":"ntk148v/skills","repo":"github.com/ntk148v/skills"}]}`
+	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	lock, err := LoadLockFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(lock.Skills) != 1 || lock.Skills[0].Name != "handoff" || lock.Skills[0].Source != "ntk148v/skills" {
+		t.Fatalf("bad lock: %#v", lock)
+	}
+}
+
 func TestInstallSkillScopeFlags(t *testing.T) {
 	r := &recordingRunner{out: []byte("[]")}
 	c := NewNpxClientWithRunner(r)

@@ -67,15 +67,18 @@ type LogEntry struct {
 	Err     string    `json:"err,omitempty"`
 }
 
-type Snapshot struct {
-	Sources map[string]string `json:"sources"`
-	Skills  []SnapshotSkill   `json:"skills"`
+type LockFile struct {
+	Version int         `json:"version"`
+	Skills  []LockSkill `json:"skills"`
 }
 
-type SnapshotSkill struct {
-	Source string   `json:"source"`
-	Scope  string   `json:"scope"`
-	Agents []string `json:"agents"`
+type LockSkill struct {
+	Name         string `json:"name"`
+	Source       string `json:"source"`
+	Repo         string `json:"repo,omitempty"`
+	SourceType   string `json:"sourceType,omitempty"`
+	SkillPath    string `json:"skillPath,omitempty"`
+	ComputedHash string `json:"computedHash,omitempty"`
 }
 
 type Client interface {
@@ -91,8 +94,7 @@ type Client interface {
 	SkillDetail(context.Context, Skill) (Skill, error)
 	ListSourceSkills(context.Context, string) ([]Skill, error)
 	PruneLocks(context.Context) error
-	Dump(context.Context) (Snapshot, error)
-	Sync(context.Context, Snapshot) error
+	SyncFromLock(context.Context, string, bool) error
 }
 
 type Runner interface {
@@ -285,6 +287,48 @@ func parseListJSON(b []byte) []Skill {
 		})
 	}
 	return out
+}
+
+// ─── LoadLockFile ────────────────────────────────────────────────────
+
+func LoadLockFile(path string) (LockFile, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return LockFile{}, err
+	}
+	var raw struct {
+		Version int             `json:"version"`
+		Skills  json.RawMessage `json:"skills"`
+	}
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return LockFile{}, err
+	}
+	lock := LockFile{Version: raw.Version}
+
+	var byName map[string]LockSkill
+	if err := json.Unmarshal(raw.Skills, &byName); err == nil && byName != nil {
+		for name, item := range byName {
+			item.Name = name
+			if item.Source == "" {
+				item.Source = item.Repo
+			}
+			lock.Skills = append(lock.Skills, item)
+		}
+		sort.Slice(lock.Skills, func(i, j int) bool { return lock.Skills[i].Name < lock.Skills[j].Name })
+		return lock, nil
+	}
+
+	var list []LockSkill
+	if err := json.Unmarshal(raw.Skills, &list); err != nil {
+		return LockFile{}, err
+	}
+	for i := range list {
+		if list[i].Source == "" {
+			list[i].Source = list[i].Repo
+		}
+	}
+	lock.Skills = list
+	return lock, nil
 }
 
 // ─── Find ────────────────────────────────────────────────────────────
@@ -515,54 +559,19 @@ func parseListAvailable(out, source string) []Skill {
 	return res
 }
 
-// ─── Dump / Sync ─────────────────────────────────────────────────────
+// ─── SyncFromLock ─────────────────────────────────────────────────
 
-func (c *NpxClient) Dump(ctx context.Context) (Snapshot, error) {
-	skills, err := c.ListInstalled(ctx)
+func (c *NpxClient) SyncFromLock(ctx context.Context, lockPath string, global bool) error {
+	lock, err := LoadLockFile(lockPath)
 	if err != nil {
-		return Snapshot{}, err
+		return err
 	}
-	sources, _ := c.ListSources(ctx)
-	snap := Snapshot{Sources: map[string]string{}}
-	for _, s := range sources {
-		snap.Sources[s.Name] = s.Repo
-	}
-	for _, s := range skills {
-		snap.Skills = append(snap.Skills, SnapshotSkill{
-			Source: s.Source,
-			Scope:  string(s.Scope),
-			Agents: append([]string(nil), s.Agents...),
-		})
-	}
-	return snap, nil
-}
-
-func (c *NpxClient) Sync(ctx context.Context, snap Snapshot) error {
-	currentSources, _ := c.ListSources(ctx)
-	existing := map[string]bool{}
-	for _, s := range currentSources {
-		existing[s.Name] = true
-	}
-	for name, repo := range snap.Sources {
-		if !existing[name] {
-			if err := c.AddSource(ctx, repo); err != nil {
-				return err
-			}
+	for _, s := range lock.Skills {
+		if strings.TrimSpace(s.Name) == "" || strings.TrimSpace(s.Source) == "" {
+			continue
 		}
-	}
-	currentSkills, _ := c.ListInstalled(ctx)
-	installed := map[string]bool{}
-	for _, s := range currentSkills {
-		installed[s.Name] = true
-	}
-	for _, s := range snap.Skills {
-		if !installed[filepath.Base(s.Source)] {
-			if err := c.InstallSkill(ctx, Skill{
-				Name:   filepath.Base(s.Source),
-				Source: s.Source,
-			}, false); err != nil {
-				return err
-			}
+		if err := c.InstallSkill(ctx, Skill{Name: s.Name, Source: s.Source}, global); err != nil {
+			return err
 		}
 	}
 	return nil
