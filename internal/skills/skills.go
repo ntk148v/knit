@@ -561,55 +561,51 @@ func (c *NpxClient) ListSourceSkills(ctx context.Context, source string) ([]Skil
 	return parseListAvailable(string(out), source), nil
 }
 
-func looksLikeRealContent(s string) bool {
-	return strings.ContainsAny(s, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+func isSourceSkillName(s string) bool {
+	if s == "" {
+		return false
+	}
+	// Reject reserved output labels from npx skills prompts.
+	switch s {
+	case "skills", "skill", "available", "available-skills", "general", "source", "sources":
+		return false
+	}
+	// First character must be a lowercase letter or digit.
+	r := rune(s[0])
+	if !((r >= 'a' && r <= 'z') || (r >= '0' && r <= '9')) {
+		return false
+	}
+	// Rest must be lowercase letters, digits, dots, hyphens, underscores.
+	for i := 1; i < len(s); i++ {
+		c := s[i]
+		if !((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '.' || c == '_') {
+			return false
+		}
+	}
+	return true
 }
 
 func parseListAvailable(out, source string) []Skill {
 	var res []Skill
+	seen := map[string]bool{}
 	scanner := bufio.NewScanner(strings.NewReader(stripANSI(out)))
 	for scanner.Scan() {
-		line := scanner.Text()
-		trimmed := strings.TrimSpace(line)
+		trimmed := strings.TrimSpace(scanner.Text())
 		if trimmed == "" {
 			continue
 		}
-		// Skip bullet/decoration lines from @clack/prompts.
-		if strings.HasPrefix(trimmed, "◆") || strings.HasPrefix(trimmed, "◇") ||
-			strings.HasPrefix(trimmed, "✔") || strings.HasPrefix(trimmed, "✖") {
+		if !isSourceSkillName(trimmed) {
 			continue
 		}
-		// Skip decorative borders and lines with no real content (dashes, box-drawing, etc.).
-		if !looksLikeRealContent(trimmed) {
+		if seen[trimmed] {
 			continue
 		}
-		indent := len(line) - len(strings.TrimLeft(line, " "))
-		switch {
-		case indent == 2:
-			// Skip section headings: "General", "Available Skills",
-			// or any Capitalized word that isn't a kebab-case skill name.
-			if trimmed == "General" || trimmed == "Available Skills" {
-				continue
-			}
-			if len(trimmed) > 0 && trimmed[0] >= 'A' && trimmed[0] <= 'Z' {
-				continue
-			}
-			res = append(res, Skill{
-				Name:   trimmed,
-				Source: source,
-				ID:     source + "/" + trimmed,
-			})
-		case indent == 0 && trimmed == strings.ToLower(trimmed) && !strings.Contains(trimmed, ":") && !strings.HasPrefix(trimmed, "◆"):
-			res = append(res, Skill{
-				Name:   trimmed,
-				Source: source,
-				ID:     source + "/" + trimmed,
-			})
-		case indent >= 4 && len(res) > 0:
-			if res[len(res)-1].Description == "" {
-				res[len(res)-1].Description = trimmed
-			}
-		}
+		seen[trimmed] = true
+		res = append(res, Skill{
+			Name:   trimmed,
+			Source: source,
+			ID:     source + "/" + trimmed,
+		})
 	}
 	return res
 }

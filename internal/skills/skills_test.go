@@ -339,18 +339,8 @@ func TestParseListAvailableCurrentGroupedOutput(t *testing.T) {
 
 	got := parseListAvailable(out, "ntk148v/skills")
 	want := []Skill{
-		{
-			Name:        "grill-with-doc",
-			Source:      "ntk148v/skills",
-			ID:          "ntk148v/skills/grill-with-doc",
-			Description: "Interview the user using documentation context.",
-		},
-		{
-			Name:        "code-reviewer",
-			Source:      "ntk148v/skills",
-			ID:          "ntk148v/skills/code-reviewer",
-			Description: "Review code for correctness and maintainability.",
-		},
+		{Name: "grill-with-doc", Source: "ntk148v/skills", ID: "ntk148v/skills/grill-with-doc"},
+		{Name: "code-reviewer", Source: "ntk148v/skills", ID: "ntk148v/skills/code-reviewer"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("parsed skills mismatch\nwant %#v\n got %#v", want, got)
@@ -499,20 +489,49 @@ func TestMutationsUseNpxSkillsSoCliUpdatesLocks(t *testing.T) {
 	}
 }
 
-func TestParseListAvailableIndentedAndPlainNames(t *testing.T) {
-	out := "Available Skills\n  caveman\n    talk small\nplain-skill\n  another-skill\n"
-	items := parseListAvailable(out, "ntk148v/skills")
-	want := []string{"caveman", "plain-skill", "another-skill"}
-	if len(items) != len(want) {
-		t.Fatalf("got %d items: %#v", len(items), items)
+func TestParseListAvailableFiltersBoxDrawingAndHeaders(t *testing.T) {
+	// Mimics the actual npx skills --list output with box frames, blank lines,
+	// prompt characters, header labels, and real skill names.
+	out := strings.Join([]string{
+		"◆  Source verified!",
+		"",
+		"  Available Skills",
+		"  ───────────────────",
+		"",
+		"  ┌───────── SKILLS ─────────┐",
+		"  │                                         │",
+		"  └───────────────────────────────┘",
+		"",
+		"  General",
+		"    caveman",
+		"    handoff",
+		"  Utilities",
+		"    code-reviewer",
+		"    conventional-commits",
+		"  Engineering",
+		"    repo-analyzer",
+		"",
+		"◆  Use --skill <name> to install specific skills",
+	}, "\n")
+
+	got := parseListAvailable(out, "ntk148v/skills")
+	want := []Skill{
+		{Name: "caveman", Source: "ntk148v/skills", ID: "ntk148v/skills/caveman"},
+		{Name: "handoff", Source: "ntk148v/skills", ID: "ntk148v/skills/handoff"},
+		{Name: "code-reviewer", Source: "ntk148v/skills", ID: "ntk148v/skills/code-reviewer"},
+		{Name: "conventional-commits", Source: "ntk148v/skills", ID: "ntk148v/skills/conventional-commits"},
+		{Name: "repo-analyzer", Source: "ntk148v/skills", ID: "ntk148v/skills/repo-analyzer"},
 	}
-	for i, name := range want {
-		if items[i].Name != name || items[i].Source != "ntk148v/skills" {
-			t.Fatalf("bad item %d: %#v", i, items[i])
-		}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("parsed skills mismatch\nwant %#v\n got %#v", want, got)
 	}
-	if items[0].Description != "talk small" {
-		t.Fatalf("missing description: %#v", items[0])
+}
+
+func TestParseListAvailableDeduplicates(t *testing.T) {
+	out := "  caveman\n  caveman\n  handoff\n"
+	got := parseListAvailable(out, "ntk148v/skills")
+	if len(got) != 2 || got[0].Name != "caveman" || got[1].Name != "handoff" {
+		t.Fatalf("expected 2 deduplicated skills, got %#v", got)
 	}
 }
 
