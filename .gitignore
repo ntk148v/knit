@@ -38,3 +38,4 @@ docs/superpowers/
 
 .agents/skills
 skills-lock.json
+.tmp/

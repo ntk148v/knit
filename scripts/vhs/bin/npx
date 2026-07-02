@@ -1,0 +1,195 @@
+#!/usr/bin/env bash
+# Fake npx for VHS recording of knit.
+# Handles the subset of npx skills commands that knit calls.
+set -euo pipefail
+
+# --- helpers ---
+
+skill_json() {
+  local name="$1" path="${2:-}" scope="${3:-project}" agents="${4:-[]}"
+  if [ -n "$path" ]; then
+    # Use HOME if the path starts with /
+    path="\$HOME/${path#/}"
+  fi
+  jq -n --arg name "$name" --arg path "$path" --arg scope "$scope" --argjson agents "$agents" \
+    '{name: $name, path: $path, scope: $scope, agents: $agents}'
+}
+
+# --- parse args ---
+# npx skills <subcommand> [args...]
+# We eat "skills" as the first arg, then dispatch.
+
+cmd="${1:-}"
+shift || true
+
+case "$cmd" in
+  list)
+    # npx skills list --json  or  npx skills list -g --json
+    global=false
+    format=""
+    for arg; do
+      case "$arg" in
+        -g|--global) global=true ;;
+        --json) format=json ;;
+      esac
+    done
+
+    if [ "$format" != "json" ]; then
+      echo "{}"
+      exit 0
+    fi
+
+    if [ "$global" = true ]; then
+      # Return empty global list
+      echo "[]"
+      exit 0
+    fi
+
+    # Return project-scoped installed skills with paths under fake HOME.
+    # The paths must point to SKILL.md files for detail view to work.
+    cat <<JSON
+[
+  {"name": "caveman", "path": "$HOME/skills-data/caveman", "scope": "project", "agents": ["codex", "claude"]},
+  {"name": "frontend-design", "path": "$HOME/skills-data/frontend-design", "scope": "project", "agents": ["vercel"]},
+  {"name": "code-reviewer", "path": "$HOME/skills-data/code-reviewer", "scope": "project", "agents": ["codex"]}
+]
+JSON
+    ;;
+
+  find)
+    # npx skills find <query>
+    query="${1:-}"
+
+    # Helper: match query against a keyword (case-insensitive prefix match)
+    matches() {
+      local q="$(echo "$1" | tr '[:upper:]' '[:lower:]')"
+      local kw="$(echo "$2" | tr '[:upper:]' '[:lower:]')"
+      case "$q" in
+        "$kw"*|"$kw") return 0 ;;
+        *) return 1 ;;
+      esac
+    }
+
+    if matches "$query" "review" || matches "$query" "code"; then
+      echo "Install with npx skills add"
+      echo ""
+      echo "ntk148v/skills@code-reviewer 1.5K installs"
+      echo "└ https://skills.sh/ntk148v/skills/code-reviewer"
+      echo ""
+      echo "vercel-labs/agent-skills@code-review 800 installs"
+      echo "└ https://skills.sh/vercel-labs/agent-skills/code-review"
+      echo ""
+      echo "ntk148v/skills@conventional-commits 500 installs"
+      echo "└ https://skills.sh/ntk148v/skills/conventional-commits"
+    elif matches "$query" "design" || matches "$query" "frontend"; then
+      echo "Install with npx skills add"
+      echo ""
+      echo "vercel-labs/agent-skills@frontend-design 3.2K installs"
+      echo "└ https://skills.sh/vercel-labs/agent-skills/frontend-design"
+      echo ""
+      echo "ntk148v/skills@design-system 1.1K installs"
+      echo "└ https://skills.sh/ntk148v/skills/design-system"
+    elif matches "$query" "skill" || matches "$query" "caveman"; then
+      echo "Install with npx skills add"
+      echo ""
+      echo "ntk148v/skills@caveman 2.1K installs"
+      echo "└ https://skills.sh/ntk148v/skills/caveman"
+      echo ""
+      echo "ntk148v/skills@code-reviewer 1.5K installs"
+      echo "└ https://skills.sh/ntk148v/skills/code-reviewer"
+      echo ""
+      echo "ntk148v/skills@conventional-commits 500 installs"
+      echo "└ https://skills.sh/ntk148v/skills/conventional-commits"
+      echo ""
+      echo "vercel-labs/agent-skills@frontend-design 3.2K installs"
+      echo "└ https://skills.sh/vercel-labs/agent-skills/frontend-design"
+    else
+      echo "No skills found for \"$query\""
+    fi
+    ;;
+
+  add)
+    # npx skills add <source> [--list]  or  npx skills add <source> --skill <name> -y [-g]
+    source="${1:-}"; shift || true
+    list=false
+    skill=""
+    yes=false
+    global=false
+    for arg; do
+      case "$arg" in
+        --list) list=true ;;
+        --skill) skill="$2"; shift || true ;;
+        -y) yes=true ;;
+        -g|--global) global=true ;;
+      esac
+    done
+
+    if [ "$list" = true ]; then
+      case "$source" in
+        ntk148v/skills|github.com/ntk148v/skills)
+          echo "Install with npx skills add"
+          echo ""
+          echo "ntk148v/skills"
+          echo "├─ caveman"
+          echo "├─ code-reviewer"
+          echo "├─ conventional-commits"
+          echo "├─ repo-analyzer"
+          echo "├─ uv"
+          echo "│  └  Use --skill <name> to install specific skills"
+          ;;
+        vercel-labs/agent-skills|github.com/vercel-labs/agent-skills)
+          echo "Install with npx skills add"
+          echo ""
+          echo "vercel-labs/agent-skills"
+          echo "├─ frontend-design"
+          echo "├─ code-review"
+          echo "├─ repo-analyzer"
+          echo "├─ design-system"
+          echo "│  └  Use --skill <name> to install specific skills"
+          ;;
+        *)
+          echo "Install with npx skills add"
+          echo ""
+          echo "$source"
+          echo "├─ demo-skill"
+          echo "│  └  Use --skill <name> to install specific skills"
+          ;;
+      esac
+      exit 0
+    fi
+
+    if [ "$yes" = true ] && [ -n "$skill" ]; then
+      echo "✓ Installed $skill from $source"
+      exit 0
+    fi
+
+    # Fallback: list mode but without --list flag — still show list
+    echo "Install with npx skills add"
+    echo ""
+    echo "$source"
+    echo "├─ demo-skill"
+    echo "│  └  Use --skill <name> to install specific skills"
+    ;;
+
+  update)
+    # npx skills update <name> -y [-p|-g]
+    name="${1:-}"; shift || true
+    echo "✓ Updated $name"
+    ;;
+
+  remove)
+    # npx skills remove <name> -y [-p|-g]
+    name="${1:-}"; shift || true
+    echo "✓ Removed $name"
+    ;;
+
+  prune)
+    # npx skills prune (future command)
+    echo "Pruned locks"
+    ;;
+
+  *)
+    echo "npx: unknown command: skills $cmd $*" >&2
+    exit 1
+    ;;
+esac

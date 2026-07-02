@@ -1,10 +1,14 @@
+<p align="center">
+  <img src="assets/knit-demo.gif" alt="knit UI demo" width="900">
+</p>
+
 <div align="center">
 
 <img src="assets/logo-transparent.png" alt="knit" width="320">
 
 # KNIT
 
-**A terminal UI agent skills.**
+**A terminal UI for agent skills.**
 
 [![CI](https://img.shields.io/github/actions/workflow/status/ntk148v/knit/ci.yml?branch=main&style=flat-square&label=CI&labelColor=0f172a&color=3dbbff)](https://github.com/ntk148v/knit/actions/workflows/ci.yml) [![Go Report Card](https://goreportcard.com/badge/github.com/ntk148v/knit?style=flat-square)](https://goreportcard.com/report/github.com/ntk148v/knit) [![Release](https://img.shields.io/github/v/release/ntk148v/knit?style=flat-square&labelColor=0f172a&color=ff79f2)](https://github.com/ntk148v/knit/releases/latest) [![Go](https://img.shields.io/github/go-mod/go-version/ntk148v/knit?style=flat-square&logo=go&logoColor=white&label=Go&labelColor=0f172a&color=3dbbff)](go.mod) [![License](https://img.shields.io/badge/license-Apache-b253f5?style=flat-square&labelColor=0f172a)](LICENSE) [![Stars](https://img.shields.io/github/stars/ntk148v/knit?style=flat-square&labelColor=0f172a&color=556bf4)](https://github.com/ntk148v/knit/stargazers)
 
@@ -126,3 +130,16 @@ Project layout:
 - `internal/skills` — `npx skills` adapter, parsers, and lock-file reader.
 
 Keep changes boring: prefer small UI/state updates, no extra dependencies unless the standard library and current Charm stack cannot do it.
+
+### Recording a demo GIF
+
+The project includes a [VHS](https://github.com/charmbracelet/vhs) tape to record a UI demo GIF:
+
+```sh
+scripts/vhs/record.sh
+```
+
+Requires `vhs` from [github.com/charmbracelet/vhs](https://github.com/charmbracelet/vhs).
+
+The recording uses a fake `npx` binary and isolated home directory fixtures so it's fully deterministic and independent of your local skills configuration.
+
