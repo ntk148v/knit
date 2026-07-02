@@ -185,15 +185,13 @@ func TestMutatingCommandsScopeFlags(t *testing.T) {
 func TestAddSourceValidatesWithList(t *testing.T) {
 	r := &recordingRunner{out: []byte("some output")}
 	c := NewNpxClientWithRunner(r)
-	ctx := context.Background()
 
-	_ = c.AddSource(ctx, "vercel-labs/agent-skills")
-	if len(r.calls) != 1 {
-		t.Fatalf("expected 1 call, got %d", len(r.calls))
+	if err := c.AddSource(context.Background(), "vercel-labs/agent-skills"); err != nil {
+		t.Fatal(err)
 	}
-	got := r.calls[0]
-	if len(got) < 5 || got[len(got)-1] != "--list" {
-		t.Fatalf("expected --list as last arg, got %#v", got)
+	want := [][]string{{"npx", "skills", "add", "vercel-labs/agent-skills", "--list"}}
+	if !reflect.DeepEqual(r.calls, want) {
+		t.Fatalf("calls mismatch\nwant %#v\n got %#v", want, r.calls)
 	}
 }
 

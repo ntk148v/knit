@@ -10,7 +10,7 @@ It wraps the skills CLI with a small Bubble Tea interface so you can list instal
 - Search installed skills, discovered skills, and sources.
 - Install, update, uninstall, and prune skills from the TUI.
 - Add, update, remove, and inspect skill sources.
-- Dump/sync a portable skills snapshot at `~/.config/knit/knit.json`.
+- Sync skills from a project or global skills lock file.
 - Review action logs for commands run during the session.
 
 ## Requirements
@@ -45,7 +45,7 @@ knit
 | --------- | ------------------------------------------ |
 | Installed | View and manage installed skills.          |
 | Discover  | Search available skills and install them.  |
-| Sources   | Manage skill sources and dump/sync config. |
+| Sources   | Manage skill sources.                       |
 | Logs      | Inspect actions run in this session.       |
 
 ### Common keys
@@ -65,37 +65,32 @@ knit
 
 | Tab       | Keys                                                        |
 | --------- | ----------------------------------------------------------- |
-| Installed | `u` update, `d` uninstall, `c` actions, `D` dump, `S` sync. |
+| Installed | `u` update, `d` uninstall, `c` actions.                     |
 | Discover  | `i` install, `s` add source, `c` actions.                   |
-| Sources   | `a` add, `u` update, `d` remove, `D` dump, `S` sync.        |
+| Sources   | `a` add, `u` update, `d` remove.                            |
 | Logs      | `Enter` detail, `c` clear.                                  |
 
-## Snapshot config
+## Lock-file sync
 
-`D` writes the current skills state to:
+`knit` uses the upstream skills lock files directly:
 
-```text
-~/.config/knit/knit.json
+- Project: `./skills-lock.json`
+- Global: `~/.agents/.skill-lock.json`
+
+Sync a lock file into the current project:
+
+```sh
+knit sync -f skills-lock.json
 ```
 
-Example:
+Sync a lock file globally:
 
-```json
-{
-  "sources": {
-    "ntk148v/skills": "github.com/ntk148v/skills"
-  },
-  "skills": [
-    {
-      "source": "skills/demo",
-      "scope": "project",
-      "agents": ["opencode", "codex"]
-    }
-  ]
-}
+```sh
+knit sync -f ~/.agents/.skill-lock.json -g
 ```
 
-`S` reads that file and syncs sources and skills back through `npx skills`.
+Until [upstream skills sync](https://github.com/vercel-labs/skills/issues/283) is fixed,
+`knit` reads the lock file and installs each skill with `npx skills add <source> --skill <name> -y`.
 
 ## Development
 
@@ -109,6 +104,6 @@ Project layout:
 - `cmd/knit` — CLI entrypoint.
 - `internal/app` — Bubble Tea model, views, key handling.
 - `internal/skills` — `npx skills` adapter and parsers.
-- `internal/config` — snapshot config path/load/save helpers.
+- `internal/skills` — `npx skills` adapter, parsers, and lock-file reader.
 
 Keep changes boring: prefer small UI/state updates, no extra dependencies unless the standard library and current Charm stack cannot do it.
