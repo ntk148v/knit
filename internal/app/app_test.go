@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -692,3 +693,191 @@ func TestSourcesRefreshErrorKeepsExistingList(t *testing.T) {
 		t.Fatalf("missing error message: %q", m.message)
 	}
 }
+
+// ─── Scroll tests ─────────────────────────────────────────────────
+
+func TestInstalledLongListClipsOutput(t *testing.T) {
+	m := newTestModel()
+	m.tab = TabInstalled
+	m.focus = focusList
+	m.installed = make([]skills.Skill, 30)
+	for i := range m.installed {
+		m.installed[i] = skills.Skill{
+			Name: fmt.Sprintf("skill-%d", i),
+			Source: "test-source",
+			Scope: skills.ScopeProject,
+			Enabled: true,
+		}
+	}
+	m.installedSel = 0
+	view := m.renderInstalled()
+	// First item should be visible.
+	if !strings.Contains(view, "skill-0") {
+		t.Fatalf("first item missing from view:\n%s", view)
+	}
+	// Last item should NOT be visible (clipped).
+	if strings.Contains(view, "skill-29") {
+		t.Fatalf("last item unexpectedly visible, window too large:\n%s", view)
+	}
+	// Down-scroll indicator should be present.
+	if !strings.Contains(view, "↓ more") {
+		t.Fatalf("down scroll indicator missing:\n%s", view)
+	}
+}
+
+func TestInstalledDownScrollsIntoView(t *testing.T) {
+	m := newTestModel()
+	m.tab = TabInstalled
+	m.focus = focusList
+	m.installed = make([]skills.Skill, 30)
+	for i := range m.installed {
+		m.installed[i] = skills.Skill{
+			Name: fmt.Sprintf("skill-%d", i),
+			Source: "test-source",
+			Scope: skills.ScopeProject,
+			Enabled: true,
+		}
+	}
+	// Move selection far down.
+	m.installedSel = 25
+	view := m.renderInstalled()
+	if !strings.Contains(view, "skill-25") {
+		t.Fatalf("selected item skill-25 not visible:\n%s", view)
+	}
+	// First item should have scrolled out.
+	if strings.Contains(view, "skill-0") {
+		t.Fatalf("first item still visible after scrolling down:\n%s", view)
+	}
+	// Up-scroll indicator should be present.
+	if !strings.Contains(view, "↑ more") {
+		t.Fatalf("up scroll indicator missing:\n%s", view)
+	}
+}
+
+func TestInstalledEndJumpsToBottom(t *testing.T) {
+	m := newTestModel()
+	m.tab = TabInstalled
+	m.focus = focusList
+	m.installed = make([]skills.Skill, 30)
+	for i := range m.installed {
+		m.installed[i] = skills.Skill{
+			Name: fmt.Sprintf("skill-%d", i),
+			Source: "test-source",
+			Scope: skills.ScopeProject,
+			Enabled: true,
+		}
+	}
+	// Simulate pressing G: set selection to last item.
+	m.installedSel = 29
+	view := m.renderInstalled()
+	if !strings.Contains(view, "skill-29") {
+		t.Fatalf("last item skill-29 not visible after G:\n%s", view)
+	}
+	// Up indicator should be present.
+	if !strings.Contains(view, "↑ more") {
+		t.Fatalf("up scroll indicator missing after G:\n%s", view)
+	}
+	// Down indicator should NOT be present at the bottom.
+	if strings.Contains(view, "↓ more") {
+		t.Fatalf("down scroll indicator present at bottom:\n%s", view)
+	}
+}
+
+func TestInstalledSearchResetsOffset(t *testing.T) {
+	m := newTestModel()
+	m.tab = TabInstalled
+	m.focus = focusList
+	m.installed = make([]skills.Skill, 30)
+	for i := range m.installed {
+		m.installed[i] = skills.Skill{
+			Name: fmt.Sprintf("skill-%d", i),
+			Source: "test-source",
+			Scope: skills.ScopeProject,
+			Enabled: true,
+		}
+	}
+	// Scroll down and verify offset moved.
+	m.installedSel = 25
+	m.renderInstalled() // triggers offset adjustment
+	if m.installedOffset == 0 {
+		t.Fatal("expected non-zero offset after scrolling down")
+	}
+	// Type a search character — offset should reset.
+	m.typeSearch("test")
+	if m.installedOffset != 0 {
+		t.Fatalf("offset should be 0 after search, got %d", m.installedOffset)
+	}
+}
+
+func TestInstalledBackspaceResetsOffset(t *testing.T) {
+	m := newTestModel()
+	m.tab = TabInstalled
+	m.focus = focusList
+	m.installed = make([]skills.Skill, 30)
+	for i := range m.installed {
+		m.installed[i] = skills.Skill{
+			Name: fmt.Sprintf("skill-%d", i),
+			Source: "test-source",
+			Scope: skills.ScopeProject,
+			Enabled: true,
+		}
+	}
+	// Scroll down first.
+	m.installedSel = 25
+	m.renderInstalled()
+	prevOffset := m.installedOffset
+	// Simulate backspace (deleting from an existing search).
+	m.installedSearch = "x"
+	m.backspaceSearch()
+	// Offset should reset.
+	if m.installedOffset != 0 {
+		t.Fatalf("offset should be 0 after backspace, got %d (was %d)", m.installedOffset, prevOffset)
+	}
+}
+
+func TestDiscoverScrollClipsOutput(t *testing.T) {
+	m := newTestModel()
+	m.tab = TabDiscover
+	m.focus = focusList
+	m.discover = make([]skills.Skill, 30)
+	for i := range m.discover {
+		m.discover[i] = skills.Skill{
+			Name: fmt.Sprintf("discover-%d", i),
+			Source: "test-source",
+		}
+	}
+	m.discoverSel = 0
+	view := m.renderDiscover()
+	if !strings.Contains(view, "discover-0") {
+		t.Fatalf("first item missing:\n%s", view)
+	}
+	if strings.Contains(view, "discover-29") {
+		t.Fatalf("last item unexpectedly visible:\n%s", view)
+	}
+	if !strings.Contains(view, "↓ more") {
+		t.Fatalf("down scroll indicator missing:\n%s", view)
+	}
+}
+
+func TestLogsScrollClipsOutput(t *testing.T) {
+	m := newTestModel()
+	m.tab = TabLogs
+	m.focus = focusList
+	m.logs = make([]skills.LogEntry, 30)
+	for i := range m.logs {
+		m.logs[i] = skills.LogEntry{
+			At: time.Unix(int64(i), 0),
+			Action: "install",
+			Command: fmt.Sprintf("npx install %d", i),
+		}
+	}
+	m.logsSel = 0
+	view := m.renderLogs()
+	if !strings.Contains(view, "install") {
+		t.Fatalf("first log missing:\n%s", view)
+	}
+	if !strings.Contains(view, "↓ more") {
+		t.Fatalf("down scroll indicator missing:\n%s", view)
+	}
+}
+

@@ -80,6 +80,12 @@ type model struct {
 	discoverSearch  string
 	sourcesSearch   string
 
+	installedOffset   int
+	discoverOffset    int
+	sourcesOffset     int
+	logsOffset        int
+	sourceSkillOffset int
+
 	detailSel       int
 	detail          skills.Skill
 	preview         viewport.Model
@@ -693,14 +699,17 @@ func (m *model) typeSearch(s string) tea.Cmd {
 	case TabInstalled:
 		m.installedSearch += s
 		m.installedSel = 0
+		m.installedOffset = 0
 		return nil
 	case TabDiscover:
 		m.discoverSearch += s
 		m.discoverSel = 0
+		m.discoverOffset = 0
 		return m.refreshDiscoverCmd()
 	case TabSources:
 		m.sourcesSearch += s
 		m.sourcesSel = 0
+		m.sourcesOffset = 0
 		return nil
 	case TabLogs:
 		return nil
@@ -714,15 +723,18 @@ func (m *model) backspaceSearch() tea.Cmd {
 		if len(m.installedSearch) > 0 {
 			m.installedSearch = m.installedSearch[:len(m.installedSearch)-1]
 		}
+		m.installedOffset = 0
 	case TabDiscover:
 		if len(m.discoverSearch) > 0 {
 			m.discoverSearch = m.discoverSearch[:len(m.discoverSearch)-1]
 		}
+		m.discoverOffset = 0
 		return m.refreshDiscoverCmd()
 	case TabSources:
 		if len(m.sourcesSearch) > 0 {
 			m.sourcesSearch = m.sourcesSearch[:len(m.sourcesSearch)-1]
 		}
+		m.sourcesOffset = 0
 	}
 	return nil
 }
@@ -731,10 +743,13 @@ func (m *model) clearSearch() {
 	switch m.tab {
 	case TabInstalled:
 		m.installedSearch = ""
+		m.installedOffset = 0
 	case TabDiscover:
 		m.discoverSearch = ""
+		m.discoverOffset = 0
 	case TabSources:
 		m.sourcesSearch = ""
+		m.sourcesOffset = 0
 	}
 }
 
@@ -846,7 +861,15 @@ func (m *model) renderInstalled() string {
 		}
 		return b.String() + m.style.dim.Render("no installed skills")
 	}
-	for i, s := range items {
+	visible := m.rootListVisibleRows()
+	m.installedOffset = clampOffset(m.installedSel, m.installedOffset, len(items), visible)
+	start := m.installedOffset
+	end := min(len(items), start+visible)
+	if start > 0 {
+		b.WriteString(m.style.dim.Render("  ↑ more") + "\n")
+	}
+	for i := start; i < end; i++ {
+		s := items[i]
 		selected := i == m.installedSel && m.focus == focusList
 		sty := rowStyle(m.style, selected)
 		status := m.style.danger.Render("✖ disabled")
@@ -863,6 +886,9 @@ func (m *model) renderInstalled() string {
 			b.WriteString(m.style.dim.Render("  "+s.Description) + "\n")
 		}
 	}
+	if end < len(items) {
+		b.WriteString(m.style.dim.Render("  ↓ more") + "\n")
+	}
 	return b.String()
 }
 
@@ -876,7 +902,15 @@ func (m *model) renderDiscover() string {
 		}
 		return b.String() + m.style.dim.Render("no results")
 	}
-	for i, s := range items {
+	visible := m.rootListVisibleRows()
+	m.discoverOffset = clampOffset(m.discoverSel, m.discoverOffset, len(items), visible)
+	start := m.discoverOffset
+	end := min(len(items), start+visible)
+	if start > 0 {
+		b.WriteString(m.style.dim.Render("  ↑ more") + "\n")
+	}
+	for i := start; i < end; i++ {
+		s := items[i]
 		selected := i == m.discoverSel && m.focus == focusList
 		sty := rowStyle(m.style, selected)
 		installs := m.style.dim.Render(fmt.Sprintf("%d installs", s.Installs))
@@ -888,6 +922,9 @@ func (m *model) renderDiscover() string {
 		if s.Description != "" {
 			b.WriteString(m.style.dim.Render("  "+s.Description) + "\n")
 		}
+	}
+	if end < len(items) {
+		b.WriteString(m.style.dim.Render("  ↓ more") + "\n")
 	}
 	return b.String()
 }
@@ -903,7 +940,21 @@ func (m *model) renderSources() string {
 		rowCell{Text: "+ Add source", Style: rowStyle(m.style, addSelected)}))
 	b.WriteString("\n")
 
-	for i, s := range items {
+	visible := max(1, m.rootListVisibleRows()-1) // -1 for Add source row
+	srcIndex := 0
+	if m.sourcesSel > 1 {
+		srcIndex = m.sourcesSel - 2
+	}
+	m.sourcesOffset = clampOffset(srcIndex, m.sourcesOffset, len(items), visible)
+	start := m.sourcesOffset
+	end := min(len(items), start+visible)
+
+	if start > 0 {
+		b.WriteString(m.style.dim.Render("  ↑ more") + "\n")
+	}
+
+	for i := start; i < end; i++ {
+		s := items[i]
 		updated := "unknown"
 		if !s.Updated.IsZero() {
 			updated = s.Updated.Format("1/2/2006")
@@ -924,6 +975,10 @@ func (m *model) renderSources() string {
 			rowCell{Text: "Updated " + updated, Width: 18, Style: m.style.dim}))
 		b.WriteString("\n")
 	}
+
+	if end < len(items) {
+		b.WriteString(m.style.dim.Render("  ↓ more") + "\n")
+	}
 	return b.String()
 }
 
@@ -933,7 +988,15 @@ func (m *model) renderLogs() string {
 	if len(m.logs) == 0 {
 		return b.String() + m.style.dim.Render("no logs")
 	}
-	for i, l := range m.logs {
+	visible := m.rootListVisibleRows()
+	m.logsOffset = clampOffset(m.logsSel, m.logsOffset, len(m.logs), visible)
+	start := m.logsOffset
+	end := min(len(m.logs), start+visible)
+	if start > 0 {
+		b.WriteString(m.style.dim.Render("  ↑ more") + "\n")
+	}
+	for i := start; i < end; i++ {
+		l := m.logs[i]
 		selected := i == m.logsSel && m.focus == focusList
 		sty := rowStyle(m.style, selected)
 		status := l.Command
@@ -945,6 +1008,9 @@ func (m *model) renderLogs() string {
 			rowCell{Text: l.Action, Width: 16, Style: sty},
 			rowCell{Text: status, Style: m.style.muted}))
 		b.WriteString("\n")
+	}
+	if end < len(m.logs) {
+		b.WriteString(m.style.dim.Render("  ↓ more") + "\n")
 	}
 	return b.String()
 }
@@ -1239,18 +1305,21 @@ func (m *model) applyLoaded(msg loadedMsg) {
 		}
 		m.installed = msg.installed
 		m.installedSel = clampIndex(m.installedSel, len(m.filteredInstalled()))
+		m.installedOffset = 0
 	case TabDiscover:
 		if len(msg.discover) == 0 && len(m.discover) > 0 {
 			return
 		}
 		m.discover = msg.discover
 		m.discoverSel = clampIndex(m.discoverSel, len(m.filteredDiscover()))
+		m.discoverOffset = 0
 	case TabSources:
 		if len(msg.sources) == 0 && len(m.sources) > 0 {
 			return
 		}
 		m.sources = msg.sources
 		m.sourcesSel = clampIndex(m.sourcesSel, len(m.filteredSources())+2)
+		m.sourcesOffset = 0
 	}
 }
 
@@ -1313,6 +1382,7 @@ func (m *model) openSourceDetail(s skills.Source) tea.Cmd {
 	m.sourceDetail = s
 	m.sourceSkills = nil
 	m.sourceSkillSel = 0
+	m.sourceSkillOffset = 0
 	m.mode = modeSourceDetail
 	return m.loadSourceSkillsCmd()
 }
@@ -1414,12 +1484,24 @@ func (m *model) sourceDetailView() string {
 		return m.frame("Source Detail", b.String())
 	}
 	b.WriteString(fmt.Sprintf("\n%s\n\n", m.style.dim.Render(fmt.Sprintf("%d skills", len(m.sourceSkills)))))
-	for i, p := range m.sourceSkills {
+	// Use contentHeight-9 for source detail: header(4)+footer(1)+padding(4).
+	visible := max(1, m.contentHeight()-9)
+	m.sourceSkillOffset = clampOffset(m.sourceSkillSel, m.sourceSkillOffset, len(m.sourceSkills), visible)
+	start := m.sourceSkillOffset
+	end := min(len(m.sourceSkills), start+visible)
+	if start > 0 {
+		b.WriteString(m.style.dim.Render("  ↑ more") + "\n")
+	}
+	for i := start; i < end; i++ {
+		p := m.sourceSkills[i]
 		selected := i == m.sourceSkillSel
 		sty := rowStyle(m.style, selected)
 		b.WriteString(renderListLine(m.contentWidth(), selected,
 			rowCell{Text: p.Name, Style: sty}))
 		b.WriteString("\n")
+	}
+	if end < len(m.sourceSkills) {
+		b.WriteString(m.style.dim.Render("  ↓ more") + "\n")
 	}
 	b.WriteString("\n" + m.style.dim.Render("Enter preview/install · i install · u update · d remove · Esc back"))
 	return m.frame("Source Detail", b.String())
@@ -1622,6 +1704,13 @@ func (m *model) contentWidth() int {
 
 func (m *model) contentHeight() int {
 	return max(8, m.height-4)
+}
+
+// rootListVisibleRows returns how many items a list tab can show before
+// the view overflows its frame. Used by renderInstalled, renderDiscover etc.
+// The value subtracts header, search bar, and footer from contentHeight.
+func (m *model) rootListVisibleRows() int {
+	return max(1, m.contentHeight()-5)
 }
 
 func min(a, b int) int {

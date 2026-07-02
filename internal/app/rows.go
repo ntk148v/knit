@@ -136,6 +136,19 @@ func clampIndex(i, n int) int {
 	return i
 }
 
+func clampOffset(sel, offset, total, visible int) int {
+	if total <= 0 || visible <= 0 || visible >= total {
+		return 0
+	}
+	if sel < offset {
+		return sel
+	}
+	if sel >= offset+visible {
+		return sel - visible + 1
+	}
+	return offset
+}
+
 func rowStyle(style styles, selected bool) lipgloss.Style {
 	if selected {
 		return style.rowSelected
