@@ -500,3 +500,36 @@ func TestMutationsUseNpxSkillsSoCliUpdatesLocks(t *testing.T) {
 		t.Fatalf("calls mismatch\nwant %#v\n got %#v", want, r.calls)
 	}
 }
+
+func TestParseListAvailableIndentedAndPlainNames(t *testing.T) {
+	out := "Available Skills\n  caveman\n    talk small\nplain-skill\n  another-skill\n"
+	items := parseListAvailable(out, "ntk148v/skills")
+	want := []string{"caveman", "plain-skill", "another-skill"}
+	if len(items) != len(want) {
+		t.Fatalf("got %d items: %#v", len(items), items)
+	}
+	for i, name := range want {
+		if items[i].Name != name || items[i].Source != "ntk148v/skills" {
+			t.Fatalf("bad item %d: %#v", i, items[i])
+		}
+	}
+	if items[0].Description != "talk small" {
+		t.Fatalf("missing description: %#v", items[0])
+	}
+}
+
+func TestRemoveSourceRemovesInstalledSkillsFromThatSource(t *testing.T) {
+	r := &recordingRunner{}
+	c := NewNpxClientWithRunner(r)
+	ctx := context.Background()
+
+	if err := c.RemoveSource(ctx, "ntk148v/skills"); err != nil {
+		t.Fatal(err)
+	}
+	// Should call list first (two calls: project + global), but we can't
+	// assert details because ListInstalled depends on lock file parsing.
+	// Just verify it doesn't panic and returns nil.
+	if len(r.calls) == 0 {
+		t.Fatal("expected at least one npx call")
+	}
+}

@@ -388,9 +388,23 @@ func (c *NpxClient) AddSource(ctx context.Context, source string) error {
 	return nil
 }
 
-// RemoveSource is a no-op; there is no upstream source-remove command.
-// Config cleanup is handled by the app layer.
-func (c *NpxClient) RemoveSource(ctx context.Context, _ string) error { return nil }
+// RemoveSource removes every installed skill that belongs to the named source
+// by calling npx skills remove for each one.
+func (c *NpxClient) RemoveSource(ctx context.Context, source string) error {
+	items, err := c.ListInstalled(ctx)
+	if err != nil {
+		return err
+	}
+	for _, item := range items {
+		if item.Source != source {
+			continue
+		}
+		if err := c.UninstallSkill(ctx, item); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 // UpdateSource re-runs --list to validate the source still works.
 // Config persistence is handled by the app layer.
@@ -545,6 +559,12 @@ func parseListAvailable(out, source string) []Skill {
 			if trimmed == "General" || trimmed == "Available Skills" {
 				continue
 			}
+			res = append(res, Skill{
+				Name:   trimmed,
+				Source: source,
+				ID:     source + "/" + trimmed,
+			})
+		case indent == 0 && trimmed == strings.ToLower(trimmed) && !strings.Contains(trimmed, ":") && !strings.HasPrefix(trimmed, "◆"):
 			res = append(res, Skill{
 				Name:   trimmed,
 				Source: source,
