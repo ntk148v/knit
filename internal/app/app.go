@@ -768,17 +768,26 @@ func (m *model) rootView() string {
 	case TabLogs:
 		b.WriteString(m.renderLogs())
 	}
-	b.WriteString("\n")
-	b.WriteString(m.footer())
+
+	// Build the body (header + list) so we can compute its height.
+	body := b.String()
+	footer := m.footer()
 	if m.message != "" {
-		b.WriteString("\n")
-		b.WriteString(m.style.dim.Render(m.message))
+		footer += "\n" + m.style.dim.Render(m.message)
+	}
+
+	// Pad body so footer sits at the bottom.
+	bodyLines := strings.Count(body, "\n")
+	avail := m.contentHeight() - 1 // -1 for the trailing newline before footer
+	pad := avail - bodyLines
+	if pad > 0 {
+		body += strings.Repeat("\n", pad)
 	}
 
 	content := m.style.appFrame.
 		Width(m.contentWidth()).
 		Height(m.contentHeight()).
-		Render(b.String())
+		Render(body + "\n" + footer)
 
 	return lipgloss.Place(
 		m.width,
