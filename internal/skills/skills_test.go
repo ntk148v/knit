@@ -463,3 +463,40 @@ func TestInstallSkillScopeFlags(t *testing.T) {
 		t.Fatalf("calls mismatch\nwant %#v\n got %#v", want, r.calls)
 	}
 }
+
+func TestMutationsUseNpxSkillsSoCliUpdatesLocks(t *testing.T) {
+	r := &recordingRunner{}
+	c := NewNpxClientWithRunner(r)
+	ctx := context.Background()
+
+	if err := c.InstallSkill(ctx, Skill{Name: "caveman", Source: "ntk148v/skills"}, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.InstallSkill(ctx, Skill{Name: "uv", Source: "owner/repo"}, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.UpdateSkill(ctx, Skill{Name: "caveman", Scope: ScopeProject}); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.UpdateSkill(ctx, Skill{Name: "uv", Scope: ScopeGlobal}); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.UninstallSkill(ctx, Skill{Name: "caveman", Scope: ScopeProject}); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.UninstallSkill(ctx, Skill{Name: "uv", Scope: ScopeGlobal}); err != nil {
+		t.Fatal(err)
+	}
+
+	want := [][]string{
+		{"npx", "skills", "add", "ntk148v/skills", "--skill", "caveman", "-y"},
+		{"npx", "skills", "add", "owner/repo", "--skill", "uv", "-y", "-g"},
+		{"npx", "skills", "update", "caveman", "-y", "-p"},
+		{"npx", "skills", "update", "uv", "-y", "-g"},
+		{"npx", "skills", "remove", "caveman", "-y"},
+		{"npx", "skills", "remove", "uv", "-y", "-g"},
+	}
+	if !reflect.DeepEqual(r.calls, want) {
+		t.Fatalf("calls mismatch\nwant %#v\n got %#v", want, r.calls)
+	}
+}
