@@ -1308,7 +1308,8 @@ func (m *model) sourceDetailView() string {
 		selected := i == m.sourceSkillSel
 		sty := rowStyle(m.style, selected)
 		b.WriteString(renderListLine(m.width, selected,
-			rowCell{Text: p.Name, Style: sty}))
+			rowCell{Text: p.Name, Style: sty},
+			rowCell{Text: p.Source, Style: m.style.muted}))
 		b.WriteString("\n")
 		if p.Description != "" {
 			b.WriteString(m.style.dim.Render("  "+p.Description) + "\n")
