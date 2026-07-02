@@ -51,6 +51,32 @@ func newTestModel() *model {
 	return m
 }
 
+// ─── Test helpers for alignment tests ──────────────────────────────
+
+func testLineContaining(t *testing.T, out, needle string) string {
+	t.Helper()
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, needle) {
+			return line
+		}
+	}
+	t.Fatalf("missing line containing %q:\n%s", needle, out)
+	return ""
+}
+
+func testGapAtMost(t *testing.T, line, left, right string, maxGap int) {
+	t.Helper()
+	leftIdx := strings.Index(line, left)
+	rightIdx := strings.Index(line, right)
+	if leftIdx < 0 || rightIdx < 0 || rightIdx <= leftIdx {
+		t.Fatalf("line does not contain %q before %q:\n%s", left, right, line)
+	}
+	gap := rightIdx - (leftIdx + len(left))
+	if gap > maxGap {
+		t.Fatalf("gap between %q and %q = %d, want <= %d:\n%s", left, right, gap, maxGap, line)
+	}
+}
+
 func TestModelTabSwitchAndSearchClear(t *testing.T) {
 	m := New(fakeClient{
 		installed: []skills.Skill{{Name: "caveman", Source: "caveman", Enabled: true}},
@@ -74,6 +100,48 @@ func TestModelTabSwitchAndSearchClear(t *testing.T) {
 	if m.discoverSearch != "" {
 		t.Fatalf("search not cleared: %q", m.discoverSearch)
 	}
+}
+
+// ─── Alignment tests ────────────────────────────────────────────────
+
+func TestInstalledRootViewRowsAreLeftAlignedInFrame(t *testing.T) {
+	m := newTestModel()
+	m.width = 180
+	m.height = 24
+	m.tab = TabInstalled
+	m.focus = focusList
+	m.installed = []skills.Skill{{Name: "caveman", Source: "ntk148v/skills", Scope: skills.ScopeProject, Enabled: true}}
+
+	line := testLineContaining(t, m.rootView(), "caveman")
+	idx := strings.Index(line, "caveman")
+	if idx > 12 {
+		t.Fatalf("installed row appears centered, name starts at column %d:\n%s", idx, line)
+	}
+}
+
+func TestInstalledRowsUseCompactLeftColumns(t *testing.T) {
+	m := newTestModel()
+	m.width = 180
+	m.tab = TabInstalled
+	m.focus = focusList
+	m.installed = []skills.Skill{{Name: "caveman", Source: "ntk148v/skills", Scope: skills.ScopeProject, Enabled: true}}
+
+	line := testLineContaining(t, m.renderInstalled(), "caveman")
+	testGapAtMost(t, line, "caveman", "P", 18)
+	testGapAtMost(t, line, "P", "ntk148v/skills", 8)
+	testGapAtMost(t, line, "ntk148v/skills", "✔ enabled", 24)
+}
+
+func TestDiscoverRowsUseCompactLeftColumns(t *testing.T) {
+	m := newTestModel()
+	m.width = 180
+	m.tab = TabDiscover
+	m.focus = focusList
+	m.discover = []skills.Skill{{Name: "caveman", Source: "ntk148v/skills", Installs: 42}}
+
+	line := testLineContaining(t, m.renderDiscover(), "caveman")
+	testGapAtMost(t, line, "caveman", "ntk148v/skills", 18)
+	testGapAtMost(t, line, "ntk148v/skills", "42 installs", 24)
 }
 
 // ─── Task 1: Style smoke tests ───────────────────────────────────────
