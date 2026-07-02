@@ -845,10 +845,10 @@ func (m *model) renderInstalled() string {
 			status = m.style.success.Render("✔ enabled")
 		}
 		b.WriteString(renderListLine(m.contentWidth(), selected,
-			rowCell{Text: s.Name, Style: sty},
-			rowCell{Text: scopeBadge(m.style, s.Scope), Style: sty},
-			rowCell{Text: s.Source, Style: m.style.muted},
-			rowCell{Text: status, Style: m.style.muted}))
+			rowCell{Text: s.Name, Width: 24, Style: sty},
+			rowCell{Text: scopeBadge(m.style, s.Scope), Width: 4, Style: sty},
+			rowCell{Text: s.Source, Width: 28, Style: m.style.muted},
+			rowCell{Text: status, Width: 12, Style: m.style.muted}))
 		b.WriteString("\n")
 		if s.Description != "" {
 			b.WriteString(m.style.dim.Render("  "+s.Description) + "\n")
@@ -872,9 +872,9 @@ func (m *model) renderDiscover() string {
 		sty := rowStyle(m.style, selected)
 		installs := m.style.dim.Render(fmt.Sprintf("%d installs", s.Installs))
 		b.WriteString(renderListLine(m.contentWidth(), selected,
-			rowCell{Text: s.Name, Style: sty},
-			rowCell{Text: s.Source, Style: m.style.muted},
-			rowCell{Text: installs, Style: m.style.dim}))
+			rowCell{Text: s.Name, Width: 24, Style: sty},
+			rowCell{Text: s.Source, Width: 32, Style: m.style.muted},
+			rowCell{Text: installs, Width: 12, Style: m.style.dim}))
 		b.WriteString("\n")
 		if s.Description != "" {
 			b.WriteString(m.style.dim.Render("  "+s.Description) + "\n")
