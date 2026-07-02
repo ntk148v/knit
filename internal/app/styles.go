@@ -48,7 +48,7 @@ func newStyles() styles {
 			Border(lipgloss.NormalBorder()).
 			BorderForeground(mutedColor).
 			Padding(0, 1).
-			Align(lipgloss.Center),
+			Align(lipgloss.Left),
 		logo:  lipgloss.NewStyle().Bold(true).Background(accentColor).Foreground(selectedBg).Padding(0, 1),
 		tab:   lipgloss.NewStyle().Padding(0, 1).Foreground(mutedColor),
 		activeTab: lipgloss.NewStyle().Bold(true).Padding(0, 1).
