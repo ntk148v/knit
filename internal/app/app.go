@@ -847,7 +847,7 @@ func (m *model) renderInstalled() string {
 		b.WriteString(renderListLine(m.contentWidth(), selected,
 			rowCell{Text: s.Name, Width: 24, Style: sty},
 			rowCell{Text: scopeBadge(m.style, s.Scope), Width: 4, Style: sty},
-			rowCell{Text: s.Source, Width: 28, Style: m.style.muted},
+			rowCell{Text: s.Source, Style: m.style.muted},
 			rowCell{Text: status, Width: 12, Style: m.style.muted}))
 		b.WriteString("\n")
 		if s.Description != "" {
@@ -873,7 +873,7 @@ func (m *model) renderDiscover() string {
 		installs := m.style.dim.Render(fmt.Sprintf("%d installs", s.Installs))
 		b.WriteString(renderListLine(m.contentWidth(), selected,
 			rowCell{Text: s.Name, Width: 24, Style: sty},
-			rowCell{Text: s.Source, Width: 32, Style: m.style.muted},
+			rowCell{Text: s.Source, Style: m.style.muted},
 			rowCell{Text: installs, Width: 12, Style: m.style.dim}))
 		b.WriteString("\n")
 		if s.Description != "" {
