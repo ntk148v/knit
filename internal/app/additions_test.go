@@ -15,15 +15,22 @@ func TestSourceDetailShowsLoadedSkills(t *testing.T) {
 	m.mode = modeSourceDetail
 	m.sourceDetail = skills.Source{Name: "ntk148v/skills", Repo: "github.com/ntk148v/skills"}
 	m.applySourceSkills(sourceSkillsLoadedMsg{skills: []skills.Skill{{
-		Name:        "grill-with-doc",
-		Source:      "ntk148v/skills",
-		Description: "Interview using docs.",
+		Name:   "grill-with-doc",
+		Source: "ntk148v/skills",
 	}}})
 
 	out := m.sourceDetailView()
-	for _, want := range []string{"1 skills", "grill-with-doc", "Interview using docs."} {
+	for _, want := range []string{"1 skills", "grill-with-doc"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("source detail missing %q:\n%s", want, out)
+		}
+	}
+	// Source repo should not repeat on each row; it's in the header.
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, "grill-with-doc") && strings.Contains(line, "ntk148v/skills") {
+			if !strings.Contains(line, "Source:") && !strings.Contains(line, "github.com") {
+				t.Fatalf("source repeated on row, want name only:\n%s", out)
+			}
 		}
 	}
 	if strings.Contains(out, "loading") || strings.Contains(out, "plugins") {
@@ -194,6 +201,26 @@ func TestSourceDetailSkillsUseConsistentSelectedRows(t *testing.T) {
 	}
 	if !strings.Contains(out, "  grill-with-doc") {
 		t.Fatalf("unselected source skill missing normal prefix:\n%s", out)
+	}
+}
+
+func TestSourceDetailEnterOpensDetail(t *testing.T) {
+	m := newTestModel()
+	m.mode = modeSourceDetail
+	m.sourceDetail = skills.Source{Name: "ntk148v/skills", Repo: "github.com/ntk148v/skills"}
+	m.sourceSkills = []skills.Skill{{Name: "caveman", Source: "ntk148v/skills", ID: "ntk148v/skills/caveman"}}
+	m.sourceSkillSel = 0
+
+	cmd := m.handleSourceDetailKey(tea.KeyMsg{Type: tea.KeyEnter})
+	// openDetail returns a command, so m.detail is not set yet (it's set via messages)
+	if m.mode != modeDetail {
+		t.Fatalf("expected modeDetail after Enter, got mode %d", m.mode)
+	}
+	if m.detail.Name != "caveman" {
+		t.Fatalf("expected detail.Name caveman, got %q", m.detail.Name)
+	}
+	if cmd == nil {
+		t.Fatal("expected non-nil command from openDetail")
 	}
 }
 

@@ -1308,12 +1308,8 @@ func (m *model) sourceDetailView() string {
 		selected := i == m.sourceSkillSel
 		sty := rowStyle(m.style, selected)
 		b.WriteString(renderListLine(m.width, selected,
-			rowCell{Text: p.Name, Style: sty},
-			rowCell{Text: p.Source, Style: m.style.muted}))
+			rowCell{Text: p.Name, Style: sty}))
 		b.WriteString("\n")
-		if p.Description != "" {
-			b.WriteString(m.style.dim.Render("  "+p.Description) + "\n")
-		}
 	}
 	b.WriteString("\n" + m.style.dim.Render("Enter preview/install · i install · u update · d remove · Esc back"))
 	return m.frame("Source Detail", b.String())
