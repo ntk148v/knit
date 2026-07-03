@@ -9,50 +9,51 @@ Set Framerate 30
 
 # ── Launch knit ──────────────────────────────────────────────────
 Type "./.tmp/vhs/knit"
-Sleep 200ms
+Sleep 300ms
 Enter
-Sleep 2s
+Sleep 3s
 
-# ── Installed tab: navigate and open detail ──────────────────────
+# ── Installed tab: prove installed skills load ───────────────────
+Sleep 1.5s
 Down
-Sleep 400ms
-Down
-Sleep 300ms
-Down
-Sleep 300ms
+Sleep 900ms
 Enter
-Sleep 1.2s
+Sleep 3s
 Escape
-Sleep 400ms
+Sleep 900ms
 
 # ── Installed tab: search filter ─────────────────────────────────
 Type "/"
-Sleep 200ms
+Sleep 300ms
 Type "design"
-Sleep 1.5s
+Sleep 2.5s
 Escape
-Sleep 500ms
+Sleep 900ms
 
-# ── Switch to Discover tab, search ───────────────────────────────
+# ── Discover tab: search marketplace results ─────────────────────
 Tab
-Sleep 600ms
+Sleep 1.2s
 Type "/"
-Sleep 200ms
+Sleep 300ms
 Type "review"
-Sleep 2s
-
-# ── Switch to Sources tab, open detail ───────────────────────────
-Tab
-Sleep 600ms
-Down
-Sleep 300ms
-Down
-Sleep 300ms
+Sleep 2.5s
 Enter
-Sleep 2s
+Sleep 2.5s
 Escape
-Sleep 400ms
+Sleep 900ms
+
+# ── Sources tab: open source detail with available skills ─────────
+Tab
+Sleep 1.2s
+Down
+Sleep 800ms
+Down
+Sleep 800ms
+Enter
+Sleep 3s
 
 # ── Quit ─────────────────────────────────────────────────────────
+Escape
+Sleep 700ms
 Type "q"
-Sleep 500ms
+Sleep 700ms
