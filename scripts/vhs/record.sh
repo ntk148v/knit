@@ -16,7 +16,14 @@ echo "    Built $BUILD_DIR/knit"
 
 echo "==> Preparing recording workspace..."
 rm -rf "$WORK_DIR"
-mkdir -p "$WORK_DIR"
+mkdir -p "$WORK_DIR/home"
+
+cleanup() {
+  if [ "${CLEANUP_LOCK:-false}" = true ]; then
+    rm -f "./skills-lock.json"
+  fi
+}
+trap cleanup EXIT
 
 # Copy home fixtures into workspace (.skills-data, .config, .agents, etc.)
 if [ -d "scripts/vhs/fixtures/home" ]; then
@@ -32,6 +39,9 @@ else
   CLEANUP_LOCK=false
 fi
 
+echo "==> Checking demo fixtures..."
+scripts/vhs/check-fixtures.sh "$WORK_DIR/home"
+
 echo "==> Recording GIF with VHS..."
 export PATH="$PWD/scripts/vhs/bin:$PATH"
 export HOME="$WORK_DIR/home"
@@ -41,8 +51,3 @@ vhs "$TAPE"
 
 echo "==> Done! Output: assets/knit-demo.gif"
 ls -lh assets/knit-demo.gif
-
-# Cleanup
-if [ "$CLEANUP_LOCK" = true ]; then
-  rm -f "./skills-lock.json"
-fi
