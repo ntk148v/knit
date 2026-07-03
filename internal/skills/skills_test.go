@@ -61,6 +61,33 @@ func TestListInstalledJSON(t *testing.T) {
 	}
 }
 
+func TestApplySkillHealthAddsMinimalWarnings(t *testing.T) {
+	item := applySkillHealth(Skill{Name: "demo", Enabled: true})
+	for _, want := range []string{"missing description", "no agents reported"} {
+		if !hasWarning(item, want) {
+			t.Fatalf("missing warning %q in %#v", want, item.Warnings)
+		}
+	}
+}
+
+func TestApplySkillHealthRemovesStaleDescriptionWarning(t *testing.T) {
+	item := applySkillHealth(Skill{Name: "demo", Description: "exists", Warnings: []string{"missing description", "no agents reported"}, Agents: []string{"codex"}})
+	for _, stale := range []string{"missing description", "no agents reported"} {
+		if hasWarning(item, stale) {
+			t.Fatalf("stale warning %q still present in %#v", stale, item.Warnings)
+		}
+	}
+}
+
+func hasWarning(s Skill, want string) bool {
+	for _, w := range s.Warnings {
+		if w == want {
+			return true
+		}
+	}
+	return false
+}
+
 func TestFindCLIOutput(t *testing.T) {
 	runner := fakeRunner{
 		out: "Install with npx skills add\n\nvercel-labs/agent-skills@frontend-design 1.2K installs\n└ https://skills.sh/vercel-labs/agent-skills/frontend-design\n\nowner/repo@React Native\n└ https://skills.sh/owner/repo/react-native\n",
@@ -227,8 +254,8 @@ func TestEnrichInstalledSourceFromLock(t *testing.T) {
 	if got[0].Source != "github.com/ntk148v/skills" {
 		t.Fatalf("source not enriched: %q", got[0].Source)
 	}
-	if len(got[0].Warnings) != 0 {
-		t.Fatalf("unexpected warnings: %v", got[0].Warnings)
+	if !hasWarning(got[0], "missing description") || !hasWarning(got[0], "no agents reported") {
+		t.Fatalf("missing health warnings: %v", got[0].Warnings)
 	}
 }
 

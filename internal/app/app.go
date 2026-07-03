@@ -71,6 +71,8 @@ type model struct {
 	sources   []skills.Source
 	logs      []skills.LogEntry
 
+	selectedInstalled map[string]bool
+
 	installedSel int
 	discoverSel  int
 	sourcesSel   int
@@ -86,10 +88,10 @@ type model struct {
 	logsOffset        int
 	sourceSkillOffset int
 
-	detailSel       int
-	detail          skills.Skill
-	preview         viewport.Model
-	previewContent  string
+	detailSel      int
+	detail         skills.Skill
+	preview        viewport.Model
+	previewContent string
 
 	actions     []string
 	actionSel   int
@@ -103,10 +105,10 @@ type model struct {
 	sourceSkillSel int
 
 	// Install scope chooser
-	pendingInstall      skills.Skill
+	pendingInstall       skills.Skill
 	pendingInstallGlobal bool
 
-	logDetail         skills.LogEntry
+	logDetail skills.LogEntry
 }
 
 func New(client skills.Client) tea.Model {
@@ -116,12 +118,13 @@ func New(client skills.Client) tea.Model {
 	in.CharLimit = 256
 	in.Width = 60
 	m := &model{
-		client:      client,
-		ctx:         context.Background(),
-		addSourceIn: in,
-		preview:     viewport.New(0, 0),
-		style:       newStyles(),
-		focus:       focusSearch,
+		client:            client,
+		ctx:               context.Background(),
+		addSourceIn:       in,
+		preview:           viewport.New(0, 0),
+		style:             newStyles(),
+		focus:             focusSearch,
+		selectedInstalled: map[string]bool{},
 	}
 	return m
 }
@@ -165,6 +168,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.hasNextTab {
 			m.mode = msg.nextMode
 			m.tab = msg.nextTab
+		}
+		if strings.HasPrefix(msg.action, "bulk-") && msg.err == nil {
+			m.selectedInstalled = map[string]bool{}
 		}
 		if msg.refresh != nil {
 			return m, msg.refresh
@@ -478,6 +484,34 @@ func (m *model) handleInstalled(k tea.KeyMsg) tea.Cmd {
 		m.focus = focusList
 	case "r":
 		return m.refreshInstalledCmd()
+	case " ":
+		item := m.currentInstalled()
+		if item.Name != "" {
+			key := installedKey(item)
+			if m.selectedInstalled[key] {
+				delete(m.selectedInstalled, key)
+			} else {
+				m.selectedInstalled[key] = true
+			}
+		}
+	case "U":
+		items := m.selectedInstalledItems()
+		if len(items) == 0 {
+			m.message = "no skills selected"
+			return nil
+		}
+		return m.runBulkAction("bulk-update", "Updated selected skills", items, m.client.UpdateSkill, m.refreshInstalledCmd())
+	case "D":
+		items := m.selectedInstalledItems()
+		if len(items) == 0 {
+			m.message = "no skills selected"
+			return nil
+		}
+		m.mode = modeConfirm
+		m.confirm = fmt.Sprintf("Uninstall %d selected skills?", len(items))
+		m.confirmDo = func() tea.Cmd {
+			return m.runBulkAction("bulk-uninstall", "Removed selected skills", items, m.client.UninstallSkill, m.refreshInstalledCmd())
+		}
 	case "enter":
 		item := m.currentInstalled()
 		if item.Name == "" {
@@ -837,12 +871,12 @@ func (m *model) renderSearchRow() string {
 		cur = "❯ "
 		s = m.style.searchRowFocused.Width(max(20, m.contentWidth()-4))
 	}
-	return s.Render(cur + "⌕ " + value) + "\n"
+	return s.Render(cur+"⌕ "+value) + "\n"
 }
 
 func (m *model) footer() string {
 	return m.style.footer.Render(map[Tab]string{
-		TabInstalled: "/ search · Enter view · u update · d uninstall · c actions",
+		TabInstalled: "/ search · Space select · U bulk update · D bulk remove · u update · d uninstall",
 		TabDiscover:  "/ search · Enter view · i install · s add source",
 		TabSources:   "/ search · Enter view skills · a add · u update · d remove",
 		TabLogs:      "c clear · Enter detail",
@@ -876,8 +910,17 @@ func (m *model) renderInstalled() string {
 		if s.Enabled {
 			status = m.style.success.Render("✔ enabled")
 		}
+		name := s.Name
+		if m.selectedInstalled[installedKey(s)] {
+			name = "☑ " + name
+		} else if len(m.selectedInstalled) > 0 {
+			name = "☐ " + name
+		}
+		if len(s.Warnings) > 0 {
+			status += " " + m.style.warning.Render("⚠")
+		}
 		b.WriteString(renderListLine(m.contentWidth(), selected,
-			rowCell{Text: s.Name, Style: sty},
+			rowCell{Text: name, Style: sty},
 			rowCell{Text: scopeBadge(m.style, s.Scope), Style: sty},
 			rowCell{Text: s.Source, Style: m.style.muted},
 			rowCell{Text: status, Style: m.style.muted}))
@@ -1020,14 +1063,21 @@ func (m *model) renderLogs() string {
 func (m *model) detailView() string {
 	agents := ""
 	if len(m.detail.Agents) > 0 {
-		agents = "\nAgents: " + strings.Join(m.detail.Agents, ", ")
+		agents = "\nAgents: " + agentMatrix(m.detail.Agents)
+	} else {
+		agents = "\nAgents: " + agentMatrix(nil)
 	}
-	head := fmt.Sprintf("Scope: [%s]\nStatus: %s\nSource: %s\nPath: %s%s",
+	warnings := ""
+	if len(m.detail.Warnings) > 0 {
+		warnings = "\nWarnings: " + strings.Join(m.detail.Warnings, "; ")
+	}
+	head := fmt.Sprintf("Scope: [%s]\nStatus: %s\nSource: %s\nPath: %s%s%s",
 		detailScopeText(m.detail.Scope),
 		detailStatusText(m.detail),
 		emptyDash(m.detail.Source),
 		emptyDash(m.detail.Path),
-		agents)
+		agents,
+		warnings)
 	if strings.TrimSpace(m.detail.Description) != "" {
 		head += "\nDescription: " + strings.TrimSpace(m.detail.Description)
 	}
@@ -1179,9 +1229,7 @@ func mergeDetailSkill(base, detail skills.Skill) skills.Skill {
 	if detail.Preview != "" {
 		base.Preview = detail.Preview
 	}
-	if len(detail.Warnings) > 0 {
-		base.Warnings = detail.Warnings
-	}
+	base.Warnings = detail.Warnings
 	if detail.Installs != 0 {
 		base.Installs = detail.Installs
 	}
@@ -1233,6 +1281,17 @@ func (m *model) currentActionItem() skills.Skill {
 		return m.currentInstalled()
 	}
 	return m.currentDiscover()
+}
+
+func (m *model) runBulkAction(action, okMessage string, items []skills.Skill, fn func(context.Context, skills.Skill) error, refresh tea.Cmd) tea.Cmd {
+	return func() tea.Msg {
+		for _, item := range items {
+			if err := fn(m.ctx, item); err != nil {
+				return actionResultMsg{action: action, command: fmt.Sprintf("%s %s", action, item.Name), err: err, refresh: refresh, nextMode: modeNormal, nextTab: TabInstalled, hasNextTab: true}
+			}
+		}
+		return actionResultMsg{action: action, command: fmt.Sprintf("%s %d skills", action, len(items)), message: okMessage, refresh: refresh, nextMode: modeNormal, nextTab: TabInstalled, hasNextTab: true}
+	}
 }
 
 func (m *model) runAction(action, command, okMessage string, fn func() error, refresh tea.Cmd) tea.Cmd {
@@ -1304,6 +1363,7 @@ func (m *model) applyLoaded(msg loadedMsg) {
 			return
 		}
 		m.installed = msg.installed
+		m.pruneInstalledSelection()
 		m.installedSel = clampIndex(m.installedSel, len(m.filteredInstalled()))
 		m.installedOffset = 0
 	case TabDiscover:
@@ -1350,6 +1410,30 @@ func (m *model) currentInstalled() skills.Skill {
 		return skills.Skill{}
 	}
 	return items[m.installedSel]
+}
+
+func installedKey(s skills.Skill) string { return string(s.Scope) + "|" + s.Path + "|" + s.Name }
+
+func (m *model) selectedInstalledItems() []skills.Skill {
+	var out []skills.Skill
+	for _, item := range m.installed {
+		if m.selectedInstalled[installedKey(item)] {
+			out = append(out, item)
+		}
+	}
+	return out
+}
+
+func (m *model) pruneInstalledSelection() {
+	keep := map[string]bool{}
+	for _, item := range m.installed {
+		keep[installedKey(item)] = true
+	}
+	for key := range m.selectedInstalled {
+		if !keep[key] {
+			delete(m.selectedInstalled, key)
+		}
+	}
 }
 func (m *model) currentDiscover() skills.Skill {
 	items := m.filteredDiscover()
@@ -1562,6 +1646,23 @@ func statusText(s skills.SkillStatus) string {
 	return string(s)
 }
 
+func agentMatrix(visible []string) string {
+	seen := map[string]bool{}
+	for _, a := range visible {
+		seen[strings.ToLower(strings.TrimSpace(a))] = true
+	}
+	agents := []string{"claude", "codex", "cursor", "gemini"}
+	parts := make([]string, 0, len(agents))
+	for _, a := range agents {
+		mark := "-"
+		if seen[a] {
+			mark = "✓"
+		}
+		parts = append(parts, a+" "+mark)
+	}
+	return strings.Join(parts, "  ")
+}
+
 func detailStatusText(s skills.Skill) string {
 	if s.Status == skills.SkillStatus("available") {
 		return "Available"
@@ -1669,11 +1770,11 @@ type addSourceDoneMsg struct {
 }
 type actionResultMsg struct {
 	action, command, output, message string
-	err                            error
-	refresh                         tea.Cmd
-	nextMode                        mode
-	nextTab                         Tab
-	hasNextTab                      bool
+	err                              error
+	refresh                          tea.Cmd
+	nextMode                         mode
+	nextTab                          Tab
+	hasNextTab                       bool
 }
 
 type confirmResultMsg struct {
@@ -1688,6 +1789,7 @@ func errString(err error) string {
 	}
 	return err.Error()
 }
+
 // warn and dim remain as package-level helpers for non-model code.
 // ponytail: warn is a no-op; kept for callers that may pass user strings.
 // Remove when all callers migrate to m.style.warning.

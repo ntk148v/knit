@@ -17,6 +17,7 @@ func renderPreview(raw string, _width int, style styles, searchTerm string) stri
 	if raw == "" {
 		return ""
 	}
+	raw = stripFrontmatter(raw)
 	lines := strings.Split(raw, "\n")
 	lnw := lineWidth(len(lines))
 	if lnw < lineNumWidthMin {
@@ -54,6 +55,16 @@ func renderPreview(raw string, _width int, style styles, searchTerm string) stri
 	}
 	flushCode()
 	return b.String()
+}
+
+func stripFrontmatter(raw string) string {
+	if !strings.HasPrefix(raw, "---\n") {
+		return raw
+	}
+	if _, rest, ok := strings.Cut(raw[4:], "\n---\n"); ok {
+		return rest
+	}
+	return raw
 }
 
 func renderCodeBlock(lines []string, lnw int, startLine int, style styles, searchTerm string) string {

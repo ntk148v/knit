@@ -279,10 +279,10 @@ func (c *NpxClient) enrichInstalled(skills []Skill) []Skill {
 		}
 		if s.Path != "" {
 			if fi, err := os.Stat(filepath.Join(s.Path, "SKILL.md")); err != nil || !fi.Mode().IsRegular() {
-				s.Warnings = append(s.Warnings, "broken (SKILL.md missing)")
+				s.Warnings = appendWarning(s.Warnings, "broken (SKILL.md missing)")
 			}
 		}
-		out = append(out, s)
+		out = append(out, applySkillHealth(s))
 	}
 	return out
 }
@@ -617,7 +617,7 @@ func (c *NpxClient) SkillDetail(ctx context.Context, skill Skill) (Skill, error)
 			c.detailCache[key] = skill
 			return skill, nil
 		}
-		d := mergeSkillMarkdown(skill, string(content))
+		d := applySkillHealth(mergeSkillMarkdown(skill, string(content)))
 		c.detailCache[key] = d
 		return d, nil
 	}
@@ -626,7 +626,7 @@ func (c *NpxClient) SkillDetail(ctx context.Context, skill Skill) (Skill, error)
 	// source skills without hitting the remote API.
 	if skill.Source != "" && skill.Name != "" {
 		if md, err := c.loadSourceSkillMarkdown(ctx, skill.Source, skill.Name); err == nil {
-			d := mergeSkillMarkdown(skill, md)
+			d := applySkillHealth(mergeSkillMarkdown(skill, md))
 			c.detailCache[key] = d
 			return d, nil
 		}
@@ -669,7 +669,7 @@ func (c *NpxClient) SkillDetail(ctx context.Context, skill Skill) (Skill, error)
 	}
 	for _, f := range data.Files {
 		if strings.EqualFold(filepath.Base(f.Path), "SKILL.md") {
-			d := mergeSkillMarkdown(skill, f.Contents)
+			d := applySkillHealth(mergeSkillMarkdown(skill, f.Contents))
 			c.detailCache[key] = d
 			return d, nil
 		}
@@ -864,6 +864,36 @@ func parseInstalls(s string) int {
 var frontmatterRE = regexp.MustCompile(`(?s)^---\n(.*?)\n---\n(.*)$`)
 var skillBlockRE = regexp.MustCompile(`(?s)<SKILL\.md>\n(.*?)\n</SKILL\.md>`)
 var ansiRE = regexp.MustCompile(`\x1b\[[0-9;]*[A-Za-z]`)
+
+func applySkillHealth(s Skill) Skill {
+	s.Warnings = removeManagedWarnings(s.Warnings)
+	if strings.TrimSpace(s.Description) == "" {
+		s.Warnings = appendWarning(s.Warnings, "missing description")
+	}
+	if len(s.Agents) == 0 {
+		s.Warnings = appendWarning(s.Warnings, "no agents reported")
+	}
+	return s
+}
+
+func removeManagedWarnings(warnings []string) []string {
+	out := warnings[:0]
+	for _, w := range warnings {
+		if w != "missing description" && w != "no agents reported" {
+			out = append(out, w)
+		}
+	}
+	return out
+}
+
+func appendWarning(warnings []string, msg string) []string {
+	for _, w := range warnings {
+		if w == msg {
+			return warnings
+		}
+	}
+	return append(warnings, msg)
+}
 
 func mergeSkillMarkdown(base Skill, md string) Skill {
 	md = strings.TrimSpace(md)

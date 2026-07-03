@@ -39,7 +39,7 @@ func (f fakeClient) SkillDetail(context.Context, skills.Skill) (skills.Skill, er
 func (f fakeClient) ListSourceSkills(context.Context, string) ([]skills.Skill, error) {
 	return nil, nil
 }
-func (f fakeClient) PruneLocks(context.Context) error              { return nil }
+func (f fakeClient) PruneLocks(context.Context) error                 { return nil }
 func (f fakeClient) SyncFromLock(context.Context, string, bool) error { return nil }
 
 // newTestModel creates a model with a fake client, sized 80x24.
@@ -362,9 +362,54 @@ func TestInstalledAgentsRenderedInDetail(t *testing.T) {
 	m := newTestModel()
 	m.detail = skills.Skill{Name: "caveman", Source: "ntk148v/skills", Agents: []string{"codex", "claude"}, Enabled: true}
 	view := m.detailView()
-	if !strings.Contains(view, "Agents:") || !strings.Contains(view, "codex") || !strings.Contains(view, "claude") {
-		t.Fatalf("agents missing from detail:\n%s", view)
+	for _, want := range []string{"Agents:", "claude ✓", "codex ✓", "cursor -", "gemini -"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("agent matrix missing %q:\n%s", want, view)
+		}
 	}
+}
+
+func TestInstalledBulkSelectionAndUpdate(t *testing.T) {
+	client := &bulkFakeClient{}
+	m := New(client).(*model)
+	m.width = 80
+	m.height = 24
+	m.tab = TabInstalled
+	m.focus = focusList
+	m.installed = []skills.Skill{{Name: "one"}, {Name: "two"}}
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeySpace})
+	m = updated.(*model)
+	m.installedSel = 1
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeySpace})
+	m = updated.(*model)
+	if len(m.selectedInstalled) != 2 {
+		t.Fatalf("selected=%#v", m.selectedInstalled)
+	}
+
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("U")})
+	if cmd == nil {
+		t.Fatal("bulk update should return a command")
+	}
+	msg := cmd()
+	updated, _ = m.Update(msg)
+	m = updated.(*model)
+	if strings.Join(client.updated, ",") != "one,two" {
+		t.Fatalf("updated=%v", client.updated)
+	}
+	if len(m.selectedInstalled) != 0 {
+		t.Fatalf("bulk success should clear selection: %#v", m.selectedInstalled)
+	}
+}
+
+type bulkFakeClient struct {
+	fakeClient
+	updated []string
+}
+
+func (f *bulkFakeClient) UpdateSkill(_ context.Context, s skills.Skill) error {
+	f.updated = append(f.updated, s.Name)
+	return nil
 }
 
 // ─── Task 4: Uninstall returns to list ──────────────────────────────
@@ -475,6 +520,13 @@ func TestRenderPreviewAddsLineNumbers(t *testing.T) {
 	}
 }
 
+func TestRenderPreviewStripsFrontmatter(t *testing.T) {
+	out := renderPreview("---\nname: demo\ndescription: hidden\n---\n# Demo", 80, newStyles(), "")
+	if strings.Contains(out, "---") || strings.Contains(out, "description: hidden") || !strings.Contains(out, "# Demo") {
+		t.Fatalf("frontmatter not stripped cleanly:\n%s", out)
+	}
+}
+
 func TestRenderPreviewAvoidsHardcodedYellowHighlight(t *testing.T) {
 	out := renderPreview("hello skill", 80, newStyles(), "skill")
 	if strings.Contains(out, "\x1b[48;5;11m") || strings.Contains(out, "\x1b[38;5;0m") {
@@ -506,6 +558,16 @@ func TestMetadataShowsSkillDescription(t *testing.T) {
 	out := m.detailView()
 	if !strings.Contains(out, "Description:") || !strings.Contains(out, "Speak briefly") {
 		t.Fatalf("description missing from metadata:\n%s", out)
+	}
+}
+
+func TestMergeDetailSkillClearsStaleWarnings(t *testing.T) {
+	got := mergeDetailSkill(
+		skills.Skill{Name: "demo", Warnings: []string{"missing description"}},
+		skills.Skill{Name: "demo", Description: "exists"},
+	)
+	if len(got.Warnings) != 0 {
+		t.Fatalf("stale warnings were not cleared: %#v", got.Warnings)
 	}
 }
 
@@ -703,9 +765,9 @@ func TestInstalledLongListClipsOutput(t *testing.T) {
 	m.installed = make([]skills.Skill, 30)
 	for i := range m.installed {
 		m.installed[i] = skills.Skill{
-			Name: fmt.Sprintf("skill-%d", i),
-			Source: "test-source",
-			Scope: skills.ScopeProject,
+			Name:    fmt.Sprintf("skill-%d", i),
+			Source:  "test-source",
+			Scope:   skills.ScopeProject,
 			Enabled: true,
 		}
 	}
@@ -732,9 +794,9 @@ func TestInstalledDownScrollsIntoView(t *testing.T) {
 	m.installed = make([]skills.Skill, 30)
 	for i := range m.installed {
 		m.installed[i] = skills.Skill{
-			Name: fmt.Sprintf("skill-%d", i),
-			Source: "test-source",
-			Scope: skills.ScopeProject,
+			Name:    fmt.Sprintf("skill-%d", i),
+			Source:  "test-source",
+			Scope:   skills.ScopeProject,
 			Enabled: true,
 		}
 	}
@@ -761,9 +823,9 @@ func TestInstalledEndJumpsToBottom(t *testing.T) {
 	m.installed = make([]skills.Skill, 30)
 	for i := range m.installed {
 		m.installed[i] = skills.Skill{
-			Name: fmt.Sprintf("skill-%d", i),
-			Source: "test-source",
-			Scope: skills.ScopeProject,
+			Name:    fmt.Sprintf("skill-%d", i),
+			Source:  "test-source",
+			Scope:   skills.ScopeProject,
 			Enabled: true,
 		}
 	}
@@ -790,9 +852,9 @@ func TestInstalledSearchResetsOffset(t *testing.T) {
 	m.installed = make([]skills.Skill, 30)
 	for i := range m.installed {
 		m.installed[i] = skills.Skill{
-			Name: fmt.Sprintf("skill-%d", i),
-			Source: "test-source",
-			Scope: skills.ScopeProject,
+			Name:    fmt.Sprintf("skill-%d", i),
+			Source:  "test-source",
+			Scope:   skills.ScopeProject,
 			Enabled: true,
 		}
 	}
@@ -816,9 +878,9 @@ func TestInstalledBackspaceResetsOffset(t *testing.T) {
 	m.installed = make([]skills.Skill, 30)
 	for i := range m.installed {
 		m.installed[i] = skills.Skill{
-			Name: fmt.Sprintf("skill-%d", i),
-			Source: "test-source",
-			Scope: skills.ScopeProject,
+			Name:    fmt.Sprintf("skill-%d", i),
+			Source:  "test-source",
+			Scope:   skills.ScopeProject,
 			Enabled: true,
 		}
 	}
@@ -842,7 +904,7 @@ func TestDiscoverScrollClipsOutput(t *testing.T) {
 	m.discover = make([]skills.Skill, 30)
 	for i := range m.discover {
 		m.discover[i] = skills.Skill{
-			Name: fmt.Sprintf("discover-%d", i),
+			Name:   fmt.Sprintf("discover-%d", i),
 			Source: "test-source",
 		}
 	}
@@ -866,8 +928,8 @@ func TestLogsScrollClipsOutput(t *testing.T) {
 	m.logs = make([]skills.LogEntry, 30)
 	for i := range m.logs {
 		m.logs[i] = skills.LogEntry{
-			At: time.Unix(int64(i), 0),
-			Action: "install",
+			At:      time.Unix(int64(i), 0),
+			Action:  "install",
 			Command: fmt.Sprintf("npx install %d", i),
 		}
 	}
@@ -925,4 +987,3 @@ func TestRemoveSourceResultReturnsToSourcesAndRefreshes(t *testing.T) {
 		t.Fatalf("message=%q", m.message)
 	}
 }
-
