@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="assets/knit-demo.gif" alt="knit UI demo" width="900">
-</p>
-
 <div align="center">
 
 <img src="assets/logo-transparent.png" alt="knit" width="320">
@@ -19,6 +15,10 @@
 `knit` is a keyboard-first terminal UI for managing [`npx skills`](https://github.com/vercel-labs/skills) skills.
 
 It keeps the upstream CLI as the source of truth, then adds the part terminals are good at: fast browsing, focused detail views, visible actions, and no command memorization.
+
+<p align="center">
+  <img src="assets/knit-demo.gif" alt="knit UI demo" width="900">
+</p>
 
 ## Why knit?
 
@@ -142,4 +142,3 @@ scripts/vhs/record.sh
 Requires `vhs` from [github.com/charmbracelet/vhs](https://github.com/charmbracelet/vhs).
 
 The recording uses a fake `npx` binary and isolated home directory fixtures so it's fully deterministic and independent of your local skills configuration.
-
