@@ -516,25 +516,67 @@ func (c *NpxClient) AddSource(ctx context.Context, source string) error {
 }
 
 // RemoveSource removes every installed skill that belongs to the named source
-// by calling npx skills remove for each one, then removes the source from
+// by reading lock files directly (to match against the source field, not the
+// enriched repo field) and uninstalling each, then removes the source from
 // Knit's config.
 func (c *NpxClient) RemoveSource(ctx context.Context, source string) error {
-	items, err := c.ListInstalled(ctx)
-	if err != nil {
-		return err
+	// Find skills belonging to this source by reading lock files.
+	// We cannot use ListInstalled here because enrichInstalled sets
+	// skill.Source from the lock's Repo field, which may differ from
+	// the user-visible source name (e.g. "github.com/ntk148v/skills"
+	// vs "ntk148v/skills").
+	type lockSkill struct {
+		Name   string `json:"name,omitempty"`
+		Source string `json:"source"`
+		Repo   string `json:"repo,omitempty"`
 	}
-	for _, item := range items {
-		if item.Source != source {
+	for _, path := range []string{projectLockPath(), globalLockPath()} {
+		b, err := os.ReadFile(path)
+		if err != nil {
 			continue
 		}
-		if err := c.UninstallSkill(ctx, item); err != nil {
-			return err
+		var raw struct {
+			Skills json.RawMessage `json:"skills"`
+		}
+		if err := json.Unmarshal(b, &raw); err != nil {
+			continue
+		}
+
+		// Derive scope from lock file path: project lock is CWD-relative.
+		scope := ScopeGlobal
+		if path == projectLockPath() {
+			scope = ScopeProject
+		}
+
+		// Map format: {"caveman": {"source":"...","repo":"..."}}
+		var byName map[string]lockSkill
+		if json.Unmarshal(raw.Skills, &byName) == nil && byName != nil {
+			for name, entry := range byName {
+				entry.Name = name
+				if entry.Source != source && entry.Repo != source {
+					continue
+				}
+				if err := c.UninstallSkill(ctx, Skill{Name: entry.Name, Scope: scope}); err != nil {
+					return err
+				}
+			}
+			continue
+		}
+
+		// Array format: [{"name":"caveman", "source":"...", "repo":"..."}]
+		var list []lockSkill
+		if json.Unmarshal(raw.Skills, &list) == nil {
+			for _, entry := range list {
+				if entry.Source != source && entry.Repo != source {
+					continue
+				}
+				if err := c.UninstallSkill(ctx, Skill{Name: entry.Name, Scope: scope}); err != nil {
+					return err
+				}
+			}
 		}
 	}
-	if err := removeConfigSource(source); err != nil {
-		return err
-	}
-	return nil
+	return removeConfigSource(source)
 }
 
 // UpdateSource re-runs --list to validate the source still works.
