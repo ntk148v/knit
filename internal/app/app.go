@@ -1314,9 +1314,6 @@ func (m *model) applyLoaded(msg loadedMsg) {
 		m.discoverSel = clampIndex(m.discoverSel, len(m.filteredDiscover()))
 		m.discoverOffset = 0
 	case TabSources:
-		if len(msg.sources) == 0 && len(m.sources) > 0 {
-			return
-		}
 		m.sources = msg.sources
 		m.sourcesSel = clampIndex(m.sourcesSel, len(m.filteredSources())+2)
 		m.sourcesOffset = 0

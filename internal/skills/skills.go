@@ -123,6 +123,85 @@ func NewNpxClientWithRunner(r Runner) *NpxClient {
 	return &NpxClient{runner: r, detailCache: map[string]Skill{}}
 }
 
+type knitConfig struct {
+	Sources []string `json:"sources"`
+}
+
+func knitConfigPath() (string, error) {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "knit", "knit.json"), nil
+}
+
+func readKnitConfig() (knitConfig, error) {
+	path, err := knitConfigPath()
+	if err != nil {
+		return knitConfig{}, err
+	}
+	b, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return knitConfig{}, nil
+	}
+	if err != nil {
+		return knitConfig{}, err
+	}
+	var cfg knitConfig
+	if err := json.Unmarshal(b, &cfg); err != nil {
+		// Ignore unparseable config so a format change or manual edit
+		// does not brick source listing.
+		return knitConfig{}, nil
+	}
+	return cfg, nil
+}
+
+func writeKnitConfig(cfg knitConfig) error {
+	path, err := knitConfigPath()
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	b, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, append(b, '\n'), 0o644)
+}
+
+func addConfigSource(source string) error {
+	source = strings.TrimSpace(source)
+	cfg, err := readKnitConfig()
+	if err != nil {
+		return err
+	}
+	for _, s := range cfg.Sources {
+		if s == source {
+			return nil
+		}
+	}
+	cfg.Sources = append(cfg.Sources, source)
+	sort.Strings(cfg.Sources)
+	return writeKnitConfig(cfg)
+}
+
+func removeConfigSource(source string) error {
+	cfg, err := readKnitConfig()
+	if err != nil {
+		return err
+	}
+	out := cfg.Sources[:0]
+	for _, s := range cfg.Sources {
+		if s != source {
+			out = append(out, s)
+		}
+	}
+	cfg.Sources = out
+	return writeKnitConfig(cfg)
+}
+
 // ─── ListInstalled ───────────────────────────────────────────────────
 
 // ListInstalled returns skills from both project and global scopes,
@@ -369,8 +448,8 @@ func (c *NpxClient) Find(ctx context.Context, q string) ([]Skill, error) {
 
 // ─── ListSources ─────────────────────────────────────────────────────
 
-// ListSources returns installed-skill counts from project/global lock files.
-// The app layer enriches this list with config-persisted sources.
+// ListSources returns installed-skill counts from project/global lock files,
+// merged with user-added sources from Knit's config.
 func (c *NpxClient) ListSources(ctx context.Context) ([]Source, error) {
 	lockCounts := map[string]int{}
 	for _, path := range []string{projectLockPath(), globalLockPath()} {
@@ -390,9 +469,31 @@ func (c *NpxClient) ListSources(ctx context.Context) ([]Source, error) {
 			}
 		}
 	}
-	out := make([]Source, 0, len(lockCounts))
+
+	seen := map[string]Source{}
+	cfg, err := readKnitConfig()
+	if err != nil {
+		return nil, err
+	}
+	for _, name := range cfg.Sources {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		seen[name] = Source{Name: name, Repo: name}
+	}
 	for name, n := range lockCounts {
-		out = append(out, Source{Name: name, Repo: name, Installed: n, Available: n})
+		s := seen[name]
+		s.Name = name
+		s.Repo = name
+		s.Installed = n
+		s.Available = n
+		seen[name] = s
+	}
+
+	out := make([]Source, 0, len(seen))
+	for _, s := range seen {
+		out = append(out, s)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, nil
@@ -400,18 +501,23 @@ func (c *NpxClient) ListSources(ctx context.Context) ([]Source, error) {
 
 // ─── Source mutations ────────────────────────────────────────────────
 
-// AddSource validates a source by inspecting available skills.
-// Config persistence is handled by the app layer.
+// AddSource validates a source by inspecting available skills,
+// then persists it in Knit's config.
 func (c *NpxClient) AddSource(ctx context.Context, source string) error {
+	source = strings.TrimSpace(source)
+	if source == "" {
+		return errors.New("source required")
+	}
 	_, err := c.run(ctx, "npx", "skills", "add", source, "--list")
 	if err != nil {
 		return fmt.Errorf("source %q not valid: %w", source, err)
 	}
-	return nil
+	return addConfigSource(source)
 }
 
 // RemoveSource removes every installed skill that belongs to the named source
-// by calling npx skills remove for each one.
+// by calling npx skills remove for each one, then removes the source from
+// Knit's config.
 func (c *NpxClient) RemoveSource(ctx context.Context, source string) error {
 	items, err := c.ListInstalled(ctx)
 	if err != nil {
@@ -424,6 +530,9 @@ func (c *NpxClient) RemoveSource(ctx context.Context, source string) error {
 		if err := c.UninstallSkill(ctx, item); err != nil {
 			return err
 		}
+	}
+	if err := removeConfigSource(source); err != nil {
+		return err
 	}
 	return nil
 }

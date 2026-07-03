@@ -881,3 +881,48 @@ func TestLogsScrollClipsOutput(t *testing.T) {
 	}
 }
 
+func TestSourcesSuccessfulEmptyRefreshClearsExistingList(t *testing.T) {
+	m := newTestModel()
+	m.sources = []skills.Source{{Name: "ntk148v/skills", Repo: "ntk148v/skills"}}
+	m.sourcesSel = 2
+
+	m.applyLoaded(loadedMsg{tab: TabSources, sources: []skills.Source{}})
+
+	if len(m.sources) != 0 {
+		t.Fatalf("sources list stayed stale after empty refresh: %#v", m.sources)
+	}
+	// Selection may be 0 (search) or 1 (Add source row) — both are valid
+	// as long as it isn't pointing to a non-existent source.
+	if m.sourcesSel > 1 {
+		t.Fatalf("sourcesSel=%d, want 0 or 1 after empty refresh", m.sourcesSel)
+	}
+}
+
+func TestRemoveSourceResultReturnsToSourcesAndRefreshes(t *testing.T) {
+	m := newTestModel()
+	m.mode = modeConfirm
+	m.tab = TabSources
+	msg := actionResultMsg{
+		action:     "remove-source",
+		command:    "Removed source ntk148v/skills",
+		message:    "Removed source ntk148v/skills",
+		nextMode:   modeNormal,
+		nextTab:    TabSources,
+		hasNextTab: true,
+		refresh:    m.refreshSourcesCmd(),
+	}
+
+	updated, cmd := m.Update(msg)
+	m = updated.(*model)
+
+	if m.mode != modeNormal || m.tab != TabSources {
+		t.Fatalf("mode/tab=%v/%v, want normal/sources", m.mode, m.tab)
+	}
+	if cmd == nil {
+		t.Fatal("expected refresh command")
+	}
+	if m.message != "Removed source ntk148v/skills" {
+		t.Fatalf("message=%q", m.message)
+	}
+}
+

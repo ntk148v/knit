@@ -629,3 +629,81 @@ func TestSkillDetailLoadsPreviewFromCachedSource(t *testing.T) {
 		t.Fatalf("bad detail: %#v", got)
 	}
 }
+
+func TestAddSourcePersistsToKnitConfig(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	r := &recordingRunner{out: []byte("caveman\nreviewer\n")}
+	c := NewNpxClientWithRunner(r)
+
+	if err := c.AddSource(context.Background(), "ntk148v/skills"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := c.ListSources(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found bool
+	for _, s := range got {
+		if s.Name == "ntk148v/skills" && s.Repo == "ntk148v/skills" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("source not found in list: %#v", got)
+	}
+	want := [][]string{{"npx", "skills", "add", "ntk148v/skills", "--list"}}
+	if !reflect.DeepEqual(r.calls, want) {
+		t.Fatalf("calls mismatch\nwant %#v\n got %#v", want, r.calls)
+	}
+}
+
+func TestAddSourceDeduplicatesConfigSources(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	c := NewNpxClientWithRunner(&recordingRunner{out: []byte("caveman\n")})
+
+	if err := c.AddSource(context.Background(), "ntk148v/skills"); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.AddSource(context.Background(), "ntk148v/skills"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := c.ListSources(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Accept additional lock-based sources; just check for no duplicate name.
+	count := 0
+	for _, s := range got {
+		if s.Name == "ntk148v/skills" {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Fatalf("duplicate source persisted: %#v", got)
+	}
+}
+
+func TestRemoveSourceDeletesConfigSource(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	c := NewNpxClientWithRunner(&recordingRunner{out: []byte("caveman\n")})
+
+	if err := c.AddSource(context.Background(), "ntk148v/skills"); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.RemoveSource(context.Background(), "ntk148v/skills"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := c.ListSources(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range got {
+		if s.Name == "ntk148v/skills" {
+			t.Fatalf("source still listed after remove: %#v", got)
+		}
+	}
+}
