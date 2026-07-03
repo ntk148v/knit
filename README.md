@@ -44,7 +44,31 @@ It keeps the upstream CLI as the source of truth, then adds the part terminals a
 
 ## Install
 
-From this repository:
+### From a release (Linux, macOS)
+
+```sh
+curl -fsSL https://github.com/ntk148v/knit/raw/main/scripts/install.sh | bash
+```
+
+### From a release (Windows)
+
+```pwsh
+iex "& { $(Invoke-RestMethod https://github.com/ntk148v/knit/raw/main/scripts/install.ps1) }"
+```
+
+The script installs `npx skills` (first run caches it) then downloads the latest `knit` binary from GitHub releases to `/usr/local/bin` (Unix) or `~/.local/bin` (Windows).
+
+Override the install directory:
+
+```sh
+INSTALL_DIR=~/.local/bin curl -fsSL https://github.com/ntk148v/knit/raw/main/scripts/install.sh | bash
+```
+
+```pwsh
+$InstallDir = "$env:USERPROFILE\bin"; iex "& { $(Invoke-RestMethod https://github.com/ntk148v/knit/raw/main/scripts/install.ps1) }"
+```
+
+### From source
 
 ```sh
 go install ./cmd/knit
