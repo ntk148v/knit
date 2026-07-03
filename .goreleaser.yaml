@@ -1,0 +1,105 @@
+version: 2
+
+project_name: knit
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: knit
+    main: ./cmd/knit
+    binary: knit
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+
+archives:
+  - id: default
+    ids:
+      - knit
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    name_template: >-
+      {{ .ProjectName }}_ {{- title .Os }}_ {{- if eq .Arch "amd64" }}x86_64 {{-
+      else if eq .Arch "arm64" }}arm64 {{- end }}
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+
+nfpms:
+  - id: linux-packages
+    ids:
+      - knit
+    package_name: knit
+    vendor: ntk148v
+    homepage: https://github.com/ntk148v/knit
+    maintainer: Kien Nguyen <kiennt2609@gmail.com>
+    description: A terminal UI for managing npx skills.
+    license: Apache-2.0
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/bin
+    contents:
+      - src: LICENSE
+        dst: /usr/share/doc/knit/LICENSE
+      - src: README.md
+        dst: /usr/share/doc/knit/README.md
+
+snapshot:
+  version_template: '{{ incpatch .Version }}-next'
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+      - 'merge conflict'
+      - Merge pull request
+      - Merge remote-tracking branch
+      - Merge branch
+
+release:
+  github:
+    owner: ntk148v
+    name: knit
+  draft: false
+  prerelease: auto
+  mode: replace
+  footer: |
+    ## Installation
+
+    ### Linux / macOS (via script)
+
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/ntk148v/knit/main/scripts/install.sh | sh
+    ```
+
+    ### Windows (via PowerShell)
+
+    ```powershell
+    irm https://raw.githubusercontent.com/ntk148v/knit/main/scripts/install.ps1 | iex
+    ```
+
+    ### Linux (via package)
+
+    Download the .deb or .rpm from the assets below.

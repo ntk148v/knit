@@ -13,6 +13,8 @@ import (
 	"github.com/ntk148v/knit/internal/skills"
 )
 
+var version = "dev"
+
 type commandConfig struct {
 	Mode     string
 	LockFile string
