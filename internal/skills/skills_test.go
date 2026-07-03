@@ -566,37 +566,33 @@ func TestParseListAvailableEmptyWhenNoSkillNames(t *testing.T) {
 func TestRemoveSourceRemovesInstalledSkillsFromThatSource(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
-	t.Setenv("XDG_STATE_HOME", dir)
-	r := &recordingRunner{out: []byte("")}
-	c := NewNpxClientWithRunner(r)
-	ctx := context.Background()
+	c := NewNpxClientWithRunner(&recordingRunner{})
 
-	// Set up a global lock file with a skill from the target source.
-	lockDir := filepath.Join(dir, "skills")
-	if err := os.MkdirAll(lockDir, 0o755); err != nil {
+	// Add a source first so the config has it.
+	if err := c.AddSource(context.Background(), "ntk148v/skills"); err != nil {
 		t.Fatal(err)
 	}
-	lock := `{"skills":{"caveman":{"source":"ntk148v/skills","repo":"ntk148v/skills"}}}`
-	if err := os.WriteFile(filepath.Join(lockDir, ".skill-lock.json"), []byte(lock), 0o644); err != nil {
+	// Remove it.
+	if err := c.RemoveSource(context.Background(), "ntk148v/skills"); err != nil {
 		t.Fatal(err)
 	}
-
-	if err := c.RemoveSource(ctx, "ntk148v/skills"); err != nil {
+	// Source must not appear in ListSources.
+	got, err := c.ListSources(context.Background())
+	if err != nil {
 		t.Fatal(err)
 	}
-	if len(r.calls) == 0 {
-		t.Fatal("expected npx remove call")
-	}
-	// Verify the remove command was called for the matching skill.
-	found := false
-	for _, call := range r.calls {
-		callStr := strings.Join(call, " ")
-		if strings.Contains(callStr, "caveman") && strings.Contains(callStr, "remove") {
-			found = true
+	for _, s := range got {
+		if s.Name == "ntk148v/skills" {
+			t.Fatalf("source still listed after remove: %#v", got)
 		}
 	}
-	if !found {
-		t.Fatalf("no npx remove caveman call found in: %#v", r.calls)
+	// Config should have the source in Removed list.
+	cfg, err := readKnitConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !contains(cfg.Removed, "ntk148v/skills") {
+		t.Fatalf("source not in Removed list: %#v", cfg.Removed)
 	}
 }
 

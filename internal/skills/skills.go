@@ -125,6 +125,7 @@ func NewNpxClientWithRunner(r Runner) *NpxClient {
 
 type knitConfig struct {
 	Sources []string `json:"sources"`
+	Removed []string `json:"removed,omitempty"`
 }
 
 func knitConfigPath() (string, error) {
@@ -184,6 +185,8 @@ func addConfigSource(source string) error {
 	}
 	cfg.Sources = append(cfg.Sources, source)
 	sort.Strings(cfg.Sources)
+	// Clear the removed flag so re-added sources show up immediately.
+	cfg.Removed = removeString(cfg.Removed, source)
 	return writeKnitConfig(cfg)
 }
 
@@ -199,7 +202,30 @@ func removeConfigSource(source string) error {
 		}
 	}
 	cfg.Sources = out
+	// Track as removed so ListSources can filter lock-only entries.
+	if !contains(cfg.Removed, source) {
+		cfg.Removed = append(cfg.Removed, source)
+	}
 	return writeKnitConfig(cfg)
+}
+
+func contains(slice []string, s string) bool {
+	for _, v := range slice {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
+func removeString(slice []string, s string) []string {
+	out := slice[:0]
+	for _, v := range slice {
+		if v != s {
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 // ─── ListInstalled ───────────────────────────────────────────────────
@@ -483,6 +509,9 @@ func (c *NpxClient) ListSources(ctx context.Context) ([]Source, error) {
 		seen[name] = Source{Name: name, Repo: name}
 	}
 	for name, n := range lockCounts {
+		if contains(cfg.Removed, name) {
+			continue
+		}
 		s := seen[name]
 		s.Name = name
 		s.Repo = name
@@ -515,67 +544,10 @@ func (c *NpxClient) AddSource(ctx context.Context, source string) error {
 	return addConfigSource(source)
 }
 
-// RemoveSource removes every installed skill that belongs to the named source
-// by reading lock files directly (to match against the source field, not the
-// enriched repo field) and uninstalling each, then removes the source from
-// Knit's config.
+// RemoveSource removes the source from Knit's config so it no longer
+// appears in the Sources tab. Installed skills from this source are
+// preserved — the user can uninstall them individually from Installed.
 func (c *NpxClient) RemoveSource(ctx context.Context, source string) error {
-	// Find skills belonging to this source by reading lock files.
-	// We cannot use ListInstalled here because enrichInstalled sets
-	// skill.Source from the lock's Repo field, which may differ from
-	// the user-visible source name (e.g. "github.com/ntk148v/skills"
-	// vs "ntk148v/skills").
-	type lockSkill struct {
-		Name   string `json:"name,omitempty"`
-		Source string `json:"source"`
-		Repo   string `json:"repo,omitempty"`
-	}
-	for _, path := range []string{projectLockPath(), globalLockPath()} {
-		b, err := os.ReadFile(path)
-		if err != nil {
-			continue
-		}
-		var raw struct {
-			Skills json.RawMessage `json:"skills"`
-		}
-		if err := json.Unmarshal(b, &raw); err != nil {
-			continue
-		}
-
-		// Derive scope from lock file path: project lock is CWD-relative.
-		scope := ScopeGlobal
-		if path == projectLockPath() {
-			scope = ScopeProject
-		}
-
-		// Map format: {"caveman": {"source":"...","repo":"..."}}
-		var byName map[string]lockSkill
-		if json.Unmarshal(raw.Skills, &byName) == nil && byName != nil {
-			for name, entry := range byName {
-				entry.Name = name
-				if entry.Source != source && entry.Repo != source {
-					continue
-				}
-				if err := c.UninstallSkill(ctx, Skill{Name: entry.Name, Scope: scope}); err != nil {
-					return err
-				}
-			}
-			continue
-		}
-
-		// Array format: [{"name":"caveman", "source":"...", "repo":"..."}]
-		var list []lockSkill
-		if json.Unmarshal(raw.Skills, &list) == nil {
-			for _, entry := range list {
-				if entry.Source != source && entry.Repo != source {
-					continue
-				}
-				if err := c.UninstallSkill(ctx, Skill{Name: entry.Name, Scope: scope}); err != nil {
-					return err
-				}
-			}
-		}
-	}
 	return removeConfigSource(source)
 }
 
