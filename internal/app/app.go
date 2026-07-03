@@ -859,7 +859,7 @@ func (m *model) renderInstalled() string {
 		if m.installedSearch != "" {
 			return b.String() + m.style.dim.Render(fmt.Sprintf(`no results for "%s"`, m.installedSearch))
 		}
-		return b.String() + m.style.dim.Render("no installed skills")
+		return b.String() + m.style.dim.Render("no installed skills — switch to Discover to find one")
 	}
 	visible := m.rootListVisibleRows()
 	m.installedOffset = clampOffset(m.installedSel, m.installedOffset, len(items), visible)
@@ -900,7 +900,7 @@ func (m *model) renderDiscover() string {
 		if m.discoverSearch != "" {
 			return b.String() + m.style.dim.Render(fmt.Sprintf(`no results for "%s"`, m.discoverSearch))
 		}
-		return b.String() + m.style.dim.Render("no results")
+		return b.String() + m.style.dim.Render("type / to search skills")
 	}
 	visible := m.rootListVisibleRows()
 	m.discoverOffset = clampOffset(m.discoverSel, m.discoverOffset, len(items), visible)
@@ -1477,7 +1477,7 @@ func (m *model) sourceDetailView() string {
 	var b strings.Builder
 	b.WriteString(header)
 	if len(m.sourceSkills) == 0 {
-		b.WriteString("\n" + m.style.dim.Render("no skills found") + "\n")
+		b.WriteString("\n" + m.style.dim.Render("no skills found in "+src.Name) + "\n")
 		return m.frame("Source Detail", b.String())
 	}
 	b.WriteString(fmt.Sprintf("\n%s\n\n", m.style.dim.Render(fmt.Sprintf("%d skills", len(m.sourceSkills)))))

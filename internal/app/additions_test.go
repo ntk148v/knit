@@ -529,3 +529,42 @@ func TestScopeBadgeContent(t *testing.T) {
 		t.Fatal("empty scope badge missing -")
 	}
 }
+
+func TestInstalledEmptyStateSuggestsDiscover(t *testing.T) {
+	m := newTestModel()
+	m.installed = nil
+
+	out := m.renderInstalled()
+	for _, want := range []string{"no installed skills", "Discover"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("installed empty state missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestDiscoverEmptyStateSuggestsSearch(t *testing.T) {
+	m := newTestModel()
+	m.discover = nil
+	m.discoverSearch = ""
+
+	out := m.renderDiscover()
+	for _, want := range []string{"type /", "search"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("discover empty state missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestSourceDetailEmptyStateNamesSource(t *testing.T) {
+	m := newTestModel()
+	m.mode = modeSourceDetail
+	m.sourceDetail = skills.Source{Name: "ntk148v/skills", Repo: "github.com/ntk148v/skills"}
+	m.applySourceSkills(sourceSkillsLoadedMsg{skills: nil})
+
+	out := m.sourceDetailView()
+	for _, want := range []string{"no skills found", "ntk148v/skills"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("source empty state missing %q:\n%s", want, out)
+		}
+	}
+}
