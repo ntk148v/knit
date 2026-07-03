@@ -1,5 +1,9 @@
 {
+  "version": 1,
   "skills": {
+    "caveman": { "source": "ntk148v/skills" },
+    "code-reviewer": { "source": "ntk148v/skills" },
+    "frontend-design": { "source": "vercel-labs/agent-skills" },
     "uv": { "source": "ntk148v/skills" }
   }
 }

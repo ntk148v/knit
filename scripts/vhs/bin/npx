@@ -19,6 +19,9 @@ skill_json() {
 # npx skills <subcommand> [args...]
 # We eat "skills" as the first arg, then dispatch.
 
+if [ "${1:-}" = "skills" ]; then
+  shift
+fi
 cmd="${1:-}"
 shift || true
 
@@ -115,12 +118,13 @@ JSON
     skill=""
     yes=false
     global=false
-    for arg; do
-      case "$arg" in
-        --list) list=true ;;
-        --skill) skill="$2"; shift || true ;;
-        -y) yes=true ;;
-        -g|--global) global=true ;;
+    while [ "$#" -gt 0 ]; do
+      case "$1" in
+        --list) list=true; shift ;;
+        --skill) skill="${2:-}"; shift 2 ;;
+        -y) yes=true; shift ;;
+        -g|--global) global=true; shift ;;
+        *) shift ;;
       esac
     done
 
