@@ -14,9 +14,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
-	"sync"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 )
@@ -104,12 +104,32 @@ type Runner interface {
 	Run(context.Context, string, ...string) ([]byte, error)
 }
 
+const (
+	defaultCommandTimeout = 2 * time.Minute
+	defaultHTTPTimeout    = 15 * time.Second
+)
+
+var httpClient = &http.Client{Timeout: defaultHTTPTimeout}
+
+func withDefaultTimeout(ctx context.Context, d time.Duration) (context.Context, context.CancelFunc) {
+	if _, ok := ctx.Deadline(); ok {
+		return context.WithCancel(ctx)
+	}
+	return context.WithTimeout(ctx, d)
+}
+
 type execRunner struct{}
 
 func (execRunner) Run(ctx context.Context, name string, args ...string) ([]byte, error) {
+	ctx, cancel := withDefaultTimeout(ctx, defaultCommandTimeout)
+	defer cancel()
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Env = append(os.Environ(), "NO_COLOR=1")
-	return cmd.CombinedOutput()
+	out, err := cmd.CombinedOutput()
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return out, fmt.Errorf("%s %s: timed out after %v", name, strings.Join(args, " "), defaultCommandTimeout)
+	}
+	return out, err
 }
 
 type NpxClient struct {
@@ -660,7 +680,7 @@ func (c *NpxClient) SkillDetail(ctx context.Context, skill Skill) (Skill, error)
 	if err != nil {
 		return skill, err
 	}
-	res, err := http.DefaultClient.Do(req)
+	res, err := httpClient.Do(req)
 	if err != nil {
 		return skill, err
 	}
