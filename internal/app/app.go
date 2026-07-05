@@ -204,6 +204,18 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, msg.refresh
 		}
 		return m, nil
+	case clearLogsMsg:
+		m.logs = nil
+		m.mode = modeNormal
+		m.confirm = ""
+		m.message = "logs cleared"
+		return m, nil
+	case detailLoadedMsg:
+		if msg.err == nil && msg.skill.Name != "" {
+			m.detail = mergeDetailSkill(m.detail, msg.skill)
+			m.previewContent = "" // force preview re-render
+		}
+		return m, nil
 	}
 	var cmd tea.Cmd
 	m.preview, cmd = m.preview.Update(msg)
@@ -697,7 +709,7 @@ func (m *model) handleLogs(k tea.KeyMsg) tea.Cmd {
 		m.mode = modeConfirm
 		m.confirm = "Clear logs?"
 		m.confirmDo = func() tea.Cmd {
-			return func() tea.Msg { m.logs = nil; return confirmResultMsg{message: "logs cleared"} }
+			return func() tea.Msg { return clearLogsMsg{} }
 		}
 	case "enter":
 		if m.logsSel >= 0 && m.logsSel < len(m.logs) {
@@ -1189,15 +1201,10 @@ func (m *model) openDetail(s skills.Skill) tea.Cmd {
 	m.mode = modeDetail
 	return func() tea.Msg {
 		if m.client == nil {
-			return loadedMsg{}
+			return detailLoadedMsg{}
 		}
 		d, err := m.client.SkillDetail(m.ctx, s)
-		if err == nil {
-			if d.Name != "" {
-				m.detail = mergeDetailSkill(m.detail, d)
-			}
-		}
-		return loadedMsg{}
+		return detailLoadedMsg{skill: d, err: err}
 	}
 }
 
@@ -1782,6 +1789,13 @@ type confirmResultMsg struct {
 	err     error
 	refresh tea.Cmd
 }
+
+type detailLoadedMsg struct {
+	skill skills.Skill
+	err   error
+}
+
+type clearLogsMsg struct{}
 
 func errString(err error) string {
 	if err == nil {

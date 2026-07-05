@@ -1,0 +1,132 @@
+{
+  "/home/kiennt/Workspace/github.com/ntk148v/knit/cmd/knit/main.go": {
+    "mtime": 1783235452.6988633,
+    "ast_hash": "970e09e61d2a0a2ab223e6e5da9bc7a4",
+    "semantic_hash": "970e09e61d2a0a2ab223e6e5da9bc7a4"
+  },
+  "/home/kiennt/Workspace/github.com/ntk148v/knit/cmd/knit/main_test.go": {
+    "mtime": 1783004094.085341,
+    "ast_hash": "827bffe2223a85fd9aeea44e7b865f1e",
+    "semantic_hash": "827bffe2223a85fd9aeea44e7b865f1e"
+  },
+  "/home/kiennt/Workspace/github.com/ntk148v/knit/internal/app/additions_test.go": {
+    "mtime": 1783235452.7028635,
+    "ast_hash": "6ab24e88ee9029856268fa39b337f740",
+    "semantic_hash": "6ab24e88ee9029856268fa39b337f740"
+  },
+  "/home/kiennt/Workspace/github.com/ntk148v/knit/internal/app/app.go": {
+    "mtime": 1783235452.7068634,
+    "ast_hash": "9de6b422a7f568ae24c655a083da8fe2",
+    "semantic_hash": "9de6b422a7f568ae24c655a083da8fe2"
+  },
+  "/home/kiennt/Workspace/github.com/ntk148v/knit/internal/app/app_test.go": {
+    "mtime": 1783235452.7068634,
+    "ast_hash": "c0960ea83f336b128acf7cf382d10d41",
+    "semantic_hash": "c0960ea83f336b128acf7cf382d10d41"
+  },
+  "/home/kiennt/Workspace/github.com/ntk148v/knit/internal/app/preview.go": {
+    "mtime": 1783235452.7068634,
+    "ast_hash": "cc43149baa7afc27dca7a192aa93310a",
+    "semantic_hash": "cc43149baa7afc27dca7a192aa93310a"
+  },
+  "/home/kiennt/Workspace/github.com/ntk148v/knit/internal/app/rows.go": {
+    "mtime": 1783005430.3857443,
+    "ast_hash": "127aca8cb35129248076da2b0bf4d450",
+    "semantic_hash": "127aca8cb35129248076da2b0bf4d450"
+  },
+  "/home/kiennt/Workspace/github.com/ntk148v/knit/internal/app/styles.go": {
+    "mtime": 1783004094.085341,
+    "ast_hash": "b84c8c14eac36bfe2469f949ffac60d0",
+    "semantic_hash": "b84c8c14eac36bfe2469f949ffac60d0"
+  },
+  "/home/kiennt/Workspace/github.com/ntk148v/knit/internal/skills/skills.go": {
+    "mtime": 1783235452.7108634,
+    "ast_hash": "89056876b1d4d621ab43d7e42841628a",
+    "semantic_hash": "89056876b1d4d621ab43d7e42841628a"
+  },
+  "/home/kiennt/Workspace/github.com/ntk148v/knit/internal/skills/skills_test.go": {
+    "mtime": 1783235452.7148635,
+    "ast_hash": "9d4f72a40f36e0f4de90decbbdef2282",
+    "semantic_hash": "9d4f72a40f36e0f4de90decbbdef2282"
+  },
+  "/home/kiennt/Workspace/github.com/ntk148v/knit/scripts/install.ps1": {
+    "mtime": 1783235452.7148635,
+    "ast_hash": "424fcc063c9bb6df6158b4d778c3d4e7",
+    "semantic_hash": "424fcc063c9bb6df6158b4d778c3d4e7"
+  },
+  "/home/kiennt/Workspace/github.com/ntk148v/knit/scripts/install.sh": {
+    "mtime": 1783235452.7148635,
+    "ast_hash": "63ce50c5fd17d2b57e2bf9f75816f7ad",
+    "semantic_hash": "63ce50c5fd17d2b57e2bf9f75816f7ad"
+  },
+  "/home/kiennt/Workspace/github.com/ntk148v/knit/scripts/vhs/bin/npx": {
+    "mtime": 1783235452.7148635,
+    "ast_hash": "0689f888b7dcab8b7f25beaaee2a1099",
+    "semantic_hash": "0689f888b7dcab8b7f25beaaee2a1099"
+  },
+  "/home/kiennt/Workspace/github.com/ntk148v/knit/scripts/vhs/check-fixtures.sh": {
+    "mtime": 1783235452.7148635,
+    "ast_hash": "ca205d2727d019428f22d32a6d13b00d",
+    "semantic_hash": "ca205d2727d019428f22d32a6d13b00d"
+  },
+  "/home/kiennt/Workspace/github.com/ntk148v/knit/scripts/vhs/fixtures/home/.agents/.skill-lock.json": {
+    "mtime": 1783235452.7188635,
+    "ast_hash": "6113883ce299b63d3ecc653a1aaac816",
+    "semantic_hash": "6113883ce299b63d3ecc653a1aaac816"
+  },
+  "/home/kiennt/Workspace/github.com/ntk148v/knit/scripts/vhs/record.sh": {
+    "mtime": 1783235452.7188635,
+    "ast_hash": "bb5cd730406435cb851612d067fcceab",
+    "semantic_hash": "bb5cd730406435cb851612d067fcceab"
+  },
+  "/home/kiennt/Workspace/github.com/ntk148v/knit/.github/workflows/ci.yml": {
+    "mtime": 1783004094.0773425,
+    "ast_hash": "bab99324f57ac8ccaeb968d6e7c718fe",
+    "semantic_hash": "bab99324f57ac8ccaeb968d6e7c718fe"
+  },
+  "/home/kiennt/Workspace/github.com/ntk148v/knit/.github/workflows/release.yml": {
+    "mtime": 1783004094.0773425,
+    "ast_hash": "50720a6f898faa0d97ec78448770eea0",
+    "semantic_hash": "50720a6f898faa0d97ec78448770eea0"
+  },
+  "/home/kiennt/Workspace/github.com/ntk148v/knit/.goreleaser.yaml": {
+    "mtime": 1783235452.6948633,
+    "ast_hash": "ea4c28140821e4ba8d75bde811c26c76",
+    "semantic_hash": "ea4c28140821e4ba8d75bde811c26c76"
+  },
+  "/home/kiennt/Workspace/github.com/ntk148v/knit/README.md": {
+    "mtime": 1783235452.6948633,
+    "ast_hash": "7389b952f4bd769ce528f80ccac72e36",
+    "semantic_hash": "7389b952f4bd769ce528f80ccac72e36"
+  },
+  "/home/kiennt/Workspace/github.com/ntk148v/knit/scripts/vhs/fixtures/home/skills-data/caveman/SKILL.md": {
+    "mtime": 1783006125.2471287,
+    "ast_hash": "ad2a73d6be3f8a6d6ca4b87beb3e8e48",
+    "semantic_hash": "ad2a73d6be3f8a6d6ca4b87beb3e8e48"
+  },
+  "/home/kiennt/Workspace/github.com/ntk148v/knit/scripts/vhs/fixtures/home/skills-data/code-reviewer/SKILL.md": {
+    "mtime": 1783006135.9312518,
+    "ast_hash": "0419dc8c5ea10641d104d7a233ff1a6e",
+    "semantic_hash": "0419dc8c5ea10641d104d7a233ff1a6e"
+  },
+  "/home/kiennt/Workspace/github.com/ntk148v/knit/scripts/vhs/fixtures/home/skills-data/frontend-design/SKILL.md": {
+    "mtime": 1783006132.2512093,
+    "ast_hash": "0aa70aba71ff1dc2d0e436047312a3c6",
+    "semantic_hash": "0aa70aba71ff1dc2d0e436047312a3c6"
+  },
+  "/home/kiennt/Workspace/github.com/ntk148v/knit/assets/knit-demo.gif": {
+    "mtime": 1783235452.6988633,
+    "ast_hash": "1e43129ba45ace874d38ae1600aea99d",
+    "semantic_hash": "1e43129ba45ace874d38ae1600aea99d"
+  },
+  "/home/kiennt/Workspace/github.com/ntk148v/knit/assets/logo-dark.png": {
+    "mtime": 1783004094.0813417,
+    "ast_hash": "7460fe4c13cb4a670b313d524b1e335d",
+    "semantic_hash": "7460fe4c13cb4a670b313d524b1e335d"
+  },
+  "/home/kiennt/Workspace/github.com/ntk148v/knit/assets/logo-transparent.png": {
+    "mtime": 1783004094.085341,
+    "ast_hash": "6d0e9994a31fe1bfba71400d643544b7",
+    "semantic_hash": "6d0e9994a31fe1bfba71400d643544b7"
+  }
+}
