@@ -1070,16 +1070,38 @@ func (c *NpxClient) loadSourceSkillMarkdown(ctx context.Context, source, name st
 		}
 	}
 
-	candidates := []string{
-		filepath.Join(dir, name, "SKILL.md"),
-		filepath.Join(dir, "skills", name, "SKILL.md"),
-		filepath.Join(dir, ".agents", "skills", name, "SKILL.md"),
-	}
-	for _, path := range candidates {
-		b, err := os.ReadFile(path)
+	subdirs := []string{".", "skills", ".agents/skills"}
+	for _, sub := range subdirs {
+		candidate, err := safeJoinUnder(dir, sub, name, "SKILL.md")
+		if err != nil {
+			continue
+		}
+		b, err := os.ReadFile(candidate)
 		if err == nil {
 			return string(b), nil
 		}
 	}
 	return "", fmt.Errorf("SKILL.md not found for %s in %s", name, source)
+}
+
+// safeJoinUnder joins path parts and verifies the result stays under root.
+// This prevents path traversal attacks via malicious name or source inputs.
+func safeJoinUnder(root string, parts ...string) (string, error) {
+	rootClean, err := filepath.Abs(root)
+	if err != nil {
+		return "", err
+	}
+	p := filepath.Join(append([]string{rootClean}, parts...)...)
+	pClean, err := filepath.Abs(p)
+	if err != nil {
+		return "", err
+	}
+	rel, err := filepath.Rel(rootClean, pClean)
+	if err != nil {
+		return "", err
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return "", fmt.Errorf("path %q escapes cache root %q", pClean, rootClean)
+	}
+	return pClean, nil
 }

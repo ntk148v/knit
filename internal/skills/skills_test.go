@@ -751,3 +751,28 @@ func TestRemoveSourceDeletesConfigSource(t *testing.T) {
 		}
 	}
 }
+
+func TestSafeJoinUnderRejectsTraversal(t *testing.T) {
+	tests := []struct {
+		name    string
+		root    string
+		parts   []string
+		wantErr bool
+	}{
+		{"normal name", "/tmp/cache", []string{"myskill", "SKILL.md"}, false},
+		{"traversal with ..", "/tmp/cache", []string{"..", "etc", "passwd"}, true},
+		{"double traversal", "/tmp/cache", []string{"..", "..", "etc"}, true},
+		{"abs path inside", "/tmp/cache", []string{"/tmp/cache/../cache/foo"}, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := safeJoinUnder(tc.root, tc.parts...)
+			if tc.wantErr && err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !tc.wantErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
