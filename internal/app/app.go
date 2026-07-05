@@ -1366,17 +1366,11 @@ func (m *model) applyLoaded(msg loadedMsg) {
 	}
 	switch msg.tab {
 	case TabInstalled:
-		if len(msg.installed) == 0 && len(m.installed) > 0 {
-			return
-		}
 		m.installed = msg.installed
 		m.pruneInstalledSelection()
 		m.installedSel = clampIndex(m.installedSel, len(m.filteredInstalled()))
 		m.installedOffset = 0
 	case TabDiscover:
-		if len(msg.discover) == 0 && len(m.discover) > 0 {
-			return
-		}
 		m.discover = msg.discover
 		m.discoverSel = clampIndex(m.discoverSel, len(m.filteredDiscover()))
 		m.discoverOffset = 0
