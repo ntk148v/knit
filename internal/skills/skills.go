@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"sync"
 	"strconv"
 	"strings"
 	"time"
@@ -112,8 +113,22 @@ func (execRunner) Run(ctx context.Context, name string, args ...string) ([]byte,
 }
 
 type NpxClient struct {
+	mu          sync.RWMutex
 	runner      Runner
 	detailCache map[string]Skill
+}
+
+func (c *NpxClient) getCachedDetail(key string) (Skill, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	v, ok := c.detailCache[key]
+	return v, ok
+}
+
+func (c *NpxClient) setCachedDetail(key string, v Skill) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.detailCache[key] = v
 }
 
 func NewNpxClient() *NpxClient {
@@ -605,7 +620,7 @@ func (c *NpxClient) PruneLocks(context.Context) error { return nil }
 // navigating between skills does not re-fetch.
 func (c *NpxClient) SkillDetail(ctx context.Context, skill Skill) (Skill, error) {
 	key := cacheKey(skill)
-	if cached, ok := c.detailCache[key]; ok {
+	if cached, ok := c.getCachedDetail(key); ok {
 		return cached, nil
 	}
 
@@ -614,11 +629,11 @@ func (c *NpxClient) SkillDetail(ctx context.Context, skill Skill) (Skill, error)
 		content, err := os.ReadFile(filepath.Join(skill.Path, "SKILL.md"))
 		if err != nil {
 			// Cache the original skill so we don't retry a broken path.
-			c.detailCache[key] = skill
+			c.setCachedDetail(key, skill)
 			return skill, nil
 		}
 		d := applySkillHealth(mergeSkillMarkdown(skill, string(content)))
-		c.detailCache[key] = d
+		c.setCachedDetail(key, d)
 		return d, nil
 	}
 
@@ -627,7 +642,7 @@ func (c *NpxClient) SkillDetail(ctx context.Context, skill Skill) (Skill, error)
 	if skill.Source != "" && skill.Name != "" {
 		if md, err := c.loadSourceSkillMarkdown(ctx, skill.Source, skill.Name); err == nil {
 			d := applySkillHealth(mergeSkillMarkdown(skill, md))
-			c.detailCache[key] = d
+			c.setCachedDetail(key, d)
 			return d, nil
 		}
 	}
@@ -651,7 +666,7 @@ func (c *NpxClient) SkillDetail(ctx context.Context, skill Skill) (Skill, error)
 	}
 	defer res.Body.Close()
 	if res.StatusCode >= 400 {
-		c.detailCache[key] = skill
+		c.setCachedDetail(key, skill)
 		return skill, nil
 	}
 	var data struct {
@@ -670,12 +685,12 @@ func (c *NpxClient) SkillDetail(ctx context.Context, skill Skill) (Skill, error)
 	for _, f := range data.Files {
 		if strings.EqualFold(filepath.Base(f.Path), "SKILL.md") {
 			d := applySkillHealth(mergeSkillMarkdown(skill, f.Contents))
-			c.detailCache[key] = d
+			c.setCachedDetail(key, d)
 			return d, nil
 		}
 	}
 	// No SKILL.md found — cache the original.
-	c.detailCache[key] = skill
+	c.setCachedDetail(key, skill)
 	return skill, nil
 }
 
