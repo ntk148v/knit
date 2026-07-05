@@ -79,7 +79,8 @@ type model struct {
 	logsSel      int
 
 	installedSearch string
-	discoverSearch  string
+	discoverSearch     string
+	discoverSearchSeq  int
 	sourcesSearch   string
 
 	installedOffset   int
@@ -210,6 +211,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.confirm = ""
 		m.message = "logs cleared"
 		return m, nil
+	case debouncedSearchMsg:
+		if msg.seq != m.discoverSearchSeq || msg.query != m.discoverSearch {
+			return m, nil // stale debounce, ignore
+		}
+		return m, m.refreshDiscoverCmd()
 	case detailLoadedMsg:
 		if msg.err == nil && msg.skill.Name != "" {
 			m.detail = mergeDetailSkill(m.detail, msg.skill)
@@ -749,9 +755,15 @@ func (m *model) typeSearch(s string) tea.Cmd {
 		return nil
 	case TabDiscover:
 		m.discoverSearch += s
+		m.discoverSearchSeq++
 		m.discoverSel = 0
 		m.discoverOffset = 0
-		return m.refreshDiscoverCmd()
+		seq := m.discoverSearchSeq
+		q := m.discoverSearch
+		return func() tea.Msg {
+			time.Sleep(300 * time.Millisecond)
+			return debouncedSearchMsg{query: q, seq: seq}
+		}
 	case TabSources:
 		m.sourcesSearch += s
 		m.sourcesSel = 0
@@ -774,8 +786,17 @@ func (m *model) backspaceSearch() tea.Cmd {
 		if len(m.discoverSearch) > 0 {
 			m.discoverSearch = m.discoverSearch[:len(m.discoverSearch)-1]
 		}
+		m.discoverSearchSeq++
 		m.discoverOffset = 0
-		return m.refreshDiscoverCmd()
+		seq := m.discoverSearchSeq
+		if m.discoverSearch == "" {
+			return m.refreshDiscoverCmd()
+		}
+		q := m.discoverSearch
+		return func() tea.Msg {
+			time.Sleep(300 * time.Millisecond)
+			return debouncedSearchMsg{query: q, seq: seq}
+		}
 	case TabSources:
 		if len(m.sourcesSearch) > 0 {
 			m.sourcesSearch = m.sourcesSearch[:len(m.sourcesSearch)-1]
@@ -792,6 +813,7 @@ func (m *model) clearSearch() {
 		m.installedOffset = 0
 	case TabDiscover:
 		m.discoverSearch = ""
+		m.discoverSearchSeq++
 		m.discoverOffset = 0
 	case TabSources:
 		m.sourcesSearch = ""
@@ -1790,6 +1812,11 @@ type detailLoadedMsg struct {
 }
 
 type clearLogsMsg struct{}
+
+type debouncedSearchMsg struct {
+	query string
+	seq   int
+}
 
 func errString(err error) string {
 	if err == nil {
