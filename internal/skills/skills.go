@@ -1024,6 +1024,9 @@ func sourceGitURL(source string) (string, bool) {
 	if strings.HasPrefix(source, "git@") {
 		return source, true
 	}
+	if strings.HasPrefix(source, "http://") && os.Getenv("KNIT_ALLOW_INSECURE_SOURCES") != "1" {
+		return "", false
+	}
 	if strings.HasPrefix(source, "https://") || strings.HasPrefix(source, "http://") {
 		if strings.HasSuffix(source, ".git") {
 			return source, true

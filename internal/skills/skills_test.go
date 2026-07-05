@@ -656,6 +656,23 @@ func TestSourceGitURLRejectsMarketplaceJSON(t *testing.T) {
 	}
 }
 
+func TestSourceGitURLRejectsInsecureHTTPByDefault(t *testing.T) {
+	// Ensure the env is not set for this test.
+	os.Unsetenv("KNIT_ALLOW_INSECURE_SOURCES")
+	got, ok := sourceGitURL("http://github.com/ntk148v/skills.git")
+	if ok || got != "" {
+		t.Fatalf("insecure http:// should be rejected, got %q/%v", got, ok)
+	}
+}
+
+func TestSourceGitURLRejectsInsecureHTTPPlain(t *testing.T) {
+	os.Unsetenv("KNIT_ALLOW_INSECURE_SOURCES")
+	got, ok := sourceGitURL("http://example.com/repo")
+	if ok || got != "" {
+		t.Fatalf("insecure http:// should be rejected, got %q/%v", got, ok)
+	}
+}
+
 func TestSkillDetailLoadsPreviewFromCachedSource(t *testing.T) {
 	t.Setenv("KNIT_SOURCE_CACHE_DIR", t.TempDir())
 	cache := sourceCacheDir("ntk148v/skills")
