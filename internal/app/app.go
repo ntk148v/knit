@@ -1705,10 +1705,18 @@ func detailStatusText(s skills.Skill) string {
 }
 
 func detailScopeText(scope skills.Scope) string {
-	if scope == "" {
+	switch scope {
+	case skills.ScopeProject:
+		return "Project"
+	case skills.ScopeGlobal:
+		return "Global"
+	case skills.ScopeUser:
+		return "User"
+	case "":
 		return "-"
+	default:
+		return string(scope)
 	}
-	return strings.Title(string(scope))
 }
 func emptyDash(s string) string {
 	if s == "" {
