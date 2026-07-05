@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -775,17 +776,26 @@ func (m *model) typeSearch(s string) tea.Cmd {
 	return nil
 }
 
+// dropLastRune removes the last rune (not byte) from a string.
+// This preserves valid UTF-8 for non-ASCII input.
+func dropLastRune(s string) string {
+	if s == "" {
+		return ""
+	}
+	_, size := utf8.DecodeLastRuneInString(s)
+	if size <= 0 {
+		return ""
+	}
+	return s[:len(s)-size]
+}
+
 func (m *model) backspaceSearch() tea.Cmd {
 	switch m.tab {
 	case TabInstalled:
-		if len(m.installedSearch) > 0 {
-			m.installedSearch = m.installedSearch[:len(m.installedSearch)-1]
-		}
+		m.installedSearch = dropLastRune(m.installedSearch)
 		m.installedOffset = 0
 	case TabDiscover:
-		if len(m.discoverSearch) > 0 {
-			m.discoverSearch = m.discoverSearch[:len(m.discoverSearch)-1]
-		}
+		m.discoverSearch = dropLastRune(m.discoverSearch)
 		m.discoverSearchSeq++
 		m.discoverOffset = 0
 		seq := m.discoverSearchSeq
@@ -798,9 +808,7 @@ func (m *model) backspaceSearch() tea.Cmd {
 			return debouncedSearchMsg{query: q, seq: seq}
 		}
 	case TabSources:
-		if len(m.sourcesSearch) > 0 {
-			m.sourcesSearch = m.sourcesSearch[:len(m.sourcesSearch)-1]
-		}
+		m.sourcesSearch = dropLastRune(m.sourcesSearch)
 		m.sourcesOffset = 0
 	}
 	return nil

@@ -987,3 +987,22 @@ func TestRemoveSourceResultReturnsToSourcesAndRefreshes(t *testing.T) {
 		t.Fatalf("message=%q", m.message)
 	}
 }
+
+func TestDropLastRune(t *testing.T) {
+	tests := []struct {
+		in, want string
+	}{
+		{"hello", "hell"},
+		{"a", ""},
+		{"", ""},
+		{"こんにちは", "こんにち"},
+		{"🌟🔥", "🌟"},
+		{"héllo", "héll"},
+	}
+	for _, tc := range tests {
+		got := dropLastRune(tc.in)
+		if got != tc.want {
+			t.Fatalf("dropLastRune(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
