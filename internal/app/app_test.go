@@ -1033,3 +1033,46 @@ func TestInstallScopeEnterShowsInstallingMessageImmediately(t *testing.T) {
 		t.Fatalf("pending install not cleared: %#v global=%v", m.pendingInstall, m.pendingInstallGlobal)
 	}
 }
+
+func TestSourceDetailActionInstallOpensScopeChooser(t *testing.T) {
+	m := newTestModel()
+	m.tab = TabSources
+	m.mode = modeAction
+	m.detailBack = modeSourceDetail
+	m.actionSel = 0
+	m.sourceDetail = skills.Source{Name: "ntk148v/skills", Repo: "github.com/ntk148v/skills"}
+	m.detail = skills.Skill{Name: "grill-with-doc"}
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(*model)
+
+	if cmd != nil {
+		t.Fatalf("install action should only open scope chooser, got cmd %v", cmd)
+	}
+	if m.mode != modeInstallScope {
+		t.Fatalf("mode=%v, want install scope", m.mode)
+	}
+	if m.pendingInstall.Name != "grill-with-doc" || m.pendingInstall.Source != "ntk148v/skills" {
+		t.Fatalf("pending install=%#v", m.pendingInstall)
+	}
+}
+
+func TestSourceDetailActionBackReturnsToSkillList(t *testing.T) {
+	m := newTestModel()
+	m.tab = TabSources
+	m.mode = modeAction
+	m.detailBack = modeSourceDetail
+	m.actionSel = 1
+	m.sourceDetail = skills.Source{Name: "ntk148v/skills"}
+	m.detail = skills.Skill{Name: "grill-with-doc", Source: "ntk148v/skills"}
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(*model)
+
+	if cmd != nil {
+		t.Fatalf("back action should not run a command, got %v", cmd)
+	}
+	if m.mode != modeSourceDetail {
+		t.Fatalf("mode=%v, want source detail", m.mode)
+	}
+}

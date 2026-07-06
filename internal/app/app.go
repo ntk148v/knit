@@ -386,7 +386,7 @@ func (m *model) handleKey(k tea.KeyMsg) tea.Cmd {
 		case "c":
 			m.mode = modeAction
 			m.actionSel = 0
-			m.actions = detailActions(m.tab)
+			m.actions = detailActions(m.tab, m.detailBack)
 			return nil
 		case "j", "down":
 			m.preview.LineDown(1)
@@ -544,7 +544,7 @@ func (m *model) handleInstalled(k tea.KeyMsg) tea.Cmd {
 		}
 		m.mode = modeAction
 		m.actionSel = 0
-		m.actions = []string{"Update", "Uninstall", "Back to plugin list"}
+		m.actions = []string{"Update", "Uninstall", "Back to skill list"}
 	case "u":
 		item := m.currentInstalled()
 		if item.Name == "" {
@@ -1318,6 +1318,27 @@ func (m *model) runSelectedAction() tea.Cmd {
 		case 1:
 			m.mode = modeNormal
 		}
+	case TabSources:
+		if m.detailBack != modeSourceDetail {
+			return nil
+		}
+		switch m.actionSel {
+		case 0:
+			item := m.detail
+			if item.Name == "" {
+				return nil
+			}
+			if item.Source == "" {
+				item.Source = m.sourceDetail.Name
+			}
+			m.pendingInstall = item
+			m.pendingInstallGlobal = false
+			m.mode = modeInstallScope
+			return nil
+		case 1:
+			m.mode = modeSourceDetail
+			return nil
+		}
 	}
 	return nil
 }
@@ -1628,11 +1649,14 @@ func (m *model) sourceDetailView() string {
 	return m.frame("Source Detail", b.String())
 }
 
-func detailActions(tab Tab) []string {
+func detailActions(tab Tab, back mode) []string {
 	if tab == TabInstalled {
-		return []string{"Update", "Uninstall", "Back to plugin list"}
+		return []string{"Update", "Uninstall", "Back to skill list"}
 	}
-	return []string{"Install", "Back to plugin list"}
+	if back == modeSourceDetail {
+		return []string{"Install", "Back to skill list"}
+	}
+	return []string{"Install", "Back to skill list"}
 }
 
 func helpBody(tab Tab) string {
