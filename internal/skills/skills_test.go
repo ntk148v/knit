@@ -127,7 +127,7 @@ func TestSkillDetailAPI(t *testing.T) {
 			"source": "vercel-labs/agent-skills",
 			"slug":   "frontend-design",
 			"files": []map[string]any{
-				{"path": "SKILL.md", "contents": "---\nname: frontend-design\ndescription: Pretty UI\n---\n# Frontend\nHello"},
+				{"path": "SKILL.md", "contents": "---\nname: frontend-design\nsource: vercel-labs/agent-skills\ndescription: Pretty UI\n---\n# Frontend\nHello"},
 			},
 		})
 	}))
@@ -144,6 +144,19 @@ func TestSkillDetailAPI(t *testing.T) {
 	}
 	if item.Name != "frontend-design" || item.Description != "Pretty UI" || item.Preview == "" {
 		t.Fatalf("unexpected: %#v", item)
+	}
+	if item.Source != "vercel-labs/agent-skills" {
+		t.Fatalf("source=%q", item.Source)
+	}
+}
+
+func TestMergeSkillMarkdownPreservesSourceFrontmatter(t *testing.T) {
+	got := mergeSkillMarkdown(Skill{Name: "grill-with-doc", Source: "grill-with-doc"}, "---\nname: grill-with-doc\nsource: ntk148v/skills\ndescription: Grill docs\n---\n# Grill\n")
+	if got.Source != "ntk148v/skills" {
+		t.Fatalf("Source=%q, want ntk148v/skills", got.Source)
+	}
+	if got.Name != "grill-with-doc" || got.Description != "Grill docs" {
+		t.Fatalf("unexpected metadata: %#v", got)
 	}
 }
 

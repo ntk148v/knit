@@ -704,7 +704,11 @@ func (c *NpxClient) SkillDetail(ctx context.Context, skill Skill) (Skill, error)
 	}
 	for _, f := range data.Files {
 		if strings.EqualFold(filepath.Base(f.Path), "SKILL.md") {
-			d := applySkillHealth(mergeSkillMarkdown(skill, f.Contents))
+			baseSkill := skill
+			if data.Source != "" {
+				baseSkill.Source = data.Source
+			}
+			d := applySkillHealth(mergeSkillMarkdown(baseSkill, f.Contents))
 			c.setCachedDetail(key, d)
 			return d, nil
 		}
@@ -939,6 +943,9 @@ func mergeSkillMarkdown(base Skill, md string) Skill {
 	if parsed.Description != "" {
 		base.Description = parsed.Description
 	}
+	if parsed.Source != "" {
+		base.Source = parsed.Source
+	}
 	base.Preview = parsed.Preview
 	if base.Preview == "" {
 		base.Preview = md
@@ -964,6 +971,8 @@ func parseMarkdownSkill(md string) Skill {
 				res.Name = strings.TrimSpace(val)
 			case "description":
 				res.Description = strings.TrimSpace(val)
+			case "source":
+				res.Source = strings.TrimSpace(val)
 			}
 		}
 		res.Preview = strings.TrimSpace(m[2])
