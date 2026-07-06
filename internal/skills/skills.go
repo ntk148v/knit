@@ -411,17 +411,9 @@ func parseLockSources(data []byte) map[string]string {
 // ponytail: checks HOME and XDG_CONFIG_HOME. Expand if skills.sh changes
 // their default global install path.
 func findGlobalLock() string {
-	home, _ := os.UserHomeDir()
-	candidates := []string{
-		filepath.Join(home, ".config", "skills", "skills-lock.json"),
-	}
-	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-		candidates = append([]string{filepath.Join(xdg, "skills", "skills-lock.json")}, candidates...)
-	}
-	for _, p := range candidates {
-		if _, err := os.Stat(p); err == nil {
-			return p
-		}
+	p := globalLockPath()
+	if _, err := os.Stat(p); err == nil {
+		return p
 	}
 	return ""
 }
