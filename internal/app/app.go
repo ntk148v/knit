@@ -353,12 +353,11 @@ func (m *model) handleKey(k tea.KeyMsg) tea.Cmd {
 			return nil
 		case "enter":
 			item := m.pendingInstall
+			global := m.pendingInstallGlobal
 			if item.Name == "" {
 				return nil
 			}
-			return m.runAction("install", installCommand(item, m.pendingInstallGlobal), actionOKMessage("install", item),
-				func() error { return m.client.InstallSkill(m.ctx, item, m.pendingInstallGlobal) },
-				m.refreshInstalledCmd())
+			return m.startInstall(item, global)
 		case "p":
 			m.pendingInstallGlobal = false
 			return nil
@@ -1271,6 +1270,16 @@ func mergeDetailSkill(base, detail skills.Skill) skills.Skill {
 		base.Installs = detail.Installs
 	}
 	return base
+}
+
+func (m *model) startInstall(item skills.Skill, global bool) tea.Cmd {
+	m.mode = modeNormal
+	m.message = "Installing " + item.Name + "…"
+	m.pendingInstall = skills.Skill{}
+	m.pendingInstallGlobal = false
+	return m.runAction("install", installCommand(item, global), actionOKMessage("install", item),
+		func() error { return m.client.InstallSkill(m.ctx, item, global) },
+		m.refreshInstalledCmd())
 }
 
 // ─── Actions ─────────────────────────────────────────────────────────

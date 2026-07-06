@@ -604,6 +604,7 @@ func TestInstallScopeProjectAndGlobalCommands(t *testing.T) {
 	}
 
 	m.mode = modeInstallScope
+	m.pendingInstall = skills.Skill{Name: "caveman", Source: "ntk148v/skills"}
 	m.pendingInstallGlobal = true
 	cmd = m.handleKey(tea.KeyMsg{Type: tea.KeyEnter})
 	if cmd == nil {
@@ -1004,5 +1005,31 @@ func TestDropLastRune(t *testing.T) {
 		if got != tc.want {
 			t.Fatalf("dropLastRune(%q) = %q, want %q", tc.in, got, tc.want)
 		}
+	}
+}
+
+// ─── Task 1: Install-start feedback ─────────────────────────────────
+
+func TestInstallScopeEnterShowsInstallingMessageImmediately(t *testing.T) {
+	m := newTestModel()
+	m.mode = modeInstallScope
+	m.tab = TabSources
+	m.pendingInstall = skills.Skill{Name: "grill-with-doc", Source: "ntk148v/skills"}
+	m.pendingInstallGlobal = true
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(*model)
+
+	if cmd == nil {
+		t.Fatal("enter should start install command")
+	}
+	if m.mode != modeNormal {
+		t.Fatalf("mode=%v, want normal so footer message is visible", m.mode)
+	}
+	if !strings.Contains(m.message, "Installing grill-with-doc") {
+		t.Fatalf("message=%q, want installing feedback", m.message)
+	}
+	if m.pendingInstall.Name != "" || m.pendingInstallGlobal {
+		t.Fatalf("pending install not cleared: %#v global=%v", m.pendingInstall, m.pendingInstallGlobal)
 	}
 }
