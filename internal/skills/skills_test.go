@@ -264,7 +264,7 @@ func TestEnrichInstalledSourceFromLock(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("got %d skills", len(got))
 	}
-	if got[0].Source != "github.com/ntk148v/skills" {
+	if got[0].Source != "ntk148v/skills" {
 		t.Fatalf("source not enriched: %q", got[0].Source)
 	}
 	if !hasWarning(got[0], "missing description") || !hasWarning(got[0], "no agents reported") {
@@ -289,6 +289,43 @@ func TestEnrichInstalledBrokenSkill(t *testing.T) {
 }
 
 // ─── Task 7: Installed skills merge ──────────────────────────────────
+
+func TestInstalledSkillDetailKeepsLockSourceWhenMarkdownHasNoSource(t *testing.T) {
+	dir := t.TempDir()
+	lockDir := filepath.Join(dir, "node_modules", ".skills")
+	if err := os.MkdirAll(lockDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	lockContent := `{"skills":[{"name":"grill-with-doc","source":"ntk148v/skills","repo":"github.com/ntk148v/skills"}]}`
+	if err := os.WriteFile(filepath.Join(lockDir, "skills-lock.json"), []byte(lockContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	skillDir := filepath.Join(lockDir, "grill-with-doc")
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	md := "---\nname: grill-with-doc\ndescription: Grill docs\n---\n# Grill\n"
+	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(md), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	c := NewNpxClient()
+	installed := c.enrichInstalled([]Skill{{
+		Name: "grill-with-doc", Path: skillDir, Scope: ScopeProject,
+	}})
+	if installed[0].Source != "ntk148v/skills" {
+		t.Fatalf("enriched source=%q", installed[0].Source)
+	}
+
+	detail, err := c.SkillDetail(context.Background(), installed[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detail.Source != "ntk148v/skills" {
+		t.Fatalf("detail source=%q, want ntk148v/skills", detail.Source)
+	}
+}
 
 func TestListInstalledMergesProjectAndGlobal(t *testing.T) {
 	r := &sequenceRunner{outs: [][]byte{

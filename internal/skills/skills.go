@@ -378,10 +378,10 @@ func parseLockSources(data []byte) map[string]string {
 	}
 	if err := json.Unmarshal(raw.Skills, &byName); err == nil && byName != nil {
 		for name, entry := range byName {
-			if entry.Repo != "" {
-				m[name] = entry.Repo
-			} else if entry.Source != "" {
+			if entry.Source != "" {
 				m[name] = entry.Source
+			} else if entry.Repo != "" {
+				m[name] = entry.Repo
 			}
 		}
 		return m
@@ -397,10 +397,10 @@ func parseLockSources(data []byte) map[string]string {
 		return nil
 	}
 	for _, s := range list {
-		if s.Repo != "" {
-			m[s.Name] = s.Repo
-		} else if s.Source != "" {
+		if s.Source != "" {
 			m[s.Name] = s.Source
+		} else if s.Repo != "" {
+			m[s.Name] = s.Repo
 		}
 	}
 	return m
