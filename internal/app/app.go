@@ -9,6 +9,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -106,6 +107,10 @@ type model struct {
 	sourceSkills   []skills.Skill
 	sourceSkillSel int
 
+	// Running action spinner
+	spinner       spinner.Model
+	runningAction string
+
 	// Install scope chooser
 	pendingInstall       skills.Skill
 	pendingInstallGlobal bool
@@ -119,6 +124,8 @@ func New(client skills.Client) tea.Model {
 	in.Prompt = ""
 	in.CharLimit = 256
 	in.Width = 60
+	sp := spinner.New()
+	sp.Spinner = spinner.Dot
 	m := &model{
 		client:            client,
 		ctx:               context.Background(),
@@ -126,6 +133,7 @@ func New(client skills.Client) tea.Model {
 		preview:           viewport.New(0, 0),
 		style:             newStyles(),
 		focus:             focusSearch,
+		spinner:           sp,
 		selectedInstalled: map[string]bool{},
 	}
 	return m
@@ -154,6 +162,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.applyLoaded(msg)
 		return m, nil
 	case actionResultMsg:
+		m.runningAction = ""
 		m.message = msg.message
 		if msg.err != nil {
 			m.message = msg.err.Error()
@@ -224,6 +233,16 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
+
+	// Tick spinner while action is running
+	if m.runningAction != "" {
+		var cmd tea.Cmd
+		m.spinner, cmd = m.spinner.Update(msg)
+		if cmd != nil {
+			return m, cmd
+		}
+	}
+
 	var cmd tea.Cmd
 	m.preview, cmd = m.preview.Update(msg)
 	return m, cmd
@@ -518,7 +537,8 @@ func (m *model) handleInstalled(k tea.KeyMsg) tea.Cmd {
 			m.message = "no skills selected"
 			return nil
 		}
-		return m.runBulkAction("bulk-update", "Updated selected skills", items, m.client.UpdateSkill, m.refreshInstalledCmd())
+		return m.startAction(fmt.Sprintf("Updating %d selected skill(s)…", len(items)),
+			m.runBulkAction("bulk-update", "Updated selected skills", items, m.client.UpdateSkill, m.refreshInstalledCmd()))
 	case "D":
 		items := m.selectedInstalledItems()
 		if len(items) == 0 {
@@ -528,7 +548,8 @@ func (m *model) handleInstalled(k tea.KeyMsg) tea.Cmd {
 		m.mode = modeConfirm
 		m.confirm = fmt.Sprintf("Uninstall %d selected skills?", len(items))
 		m.confirmDo = func() tea.Cmd {
-			return m.runBulkAction("bulk-uninstall", "Removed selected skills", items, m.client.UninstallSkill, m.refreshInstalledCmd())
+			return m.startAction(fmt.Sprintf("Removing %d selected skill(s)…", len(items)),
+				m.runBulkAction("bulk-uninstall", "Removed selected skills", items, m.client.UninstallSkill, m.refreshInstalledCmd()))
 		}
 	case "enter":
 		item := m.currentInstalled()
@@ -550,9 +571,10 @@ func (m *model) handleInstalled(k tea.KeyMsg) tea.Cmd {
 		if item.Name == "" {
 			return nil
 		}
-		return m.runAction("update", updateCommand(item), actionOKMessage("update", item),
-			func() error { return m.client.UpdateSkill(m.ctx, item) },
-			m.refreshInstalledCmd())
+		return m.startAction(actionStartMessage("update", item),
+			m.runAction("update", updateCommand(item), actionOKMessage("update", item),
+				func() error { return m.client.UpdateSkill(m.ctx, item) },
+				m.refreshInstalledCmd()))
 	case "d":
 		item := m.currentInstalled()
 		if item.Name == "" {
@@ -561,16 +583,18 @@ func (m *model) handleInstalled(k tea.KeyMsg) tea.Cmd {
 		m.mode = modeConfirm
 		m.confirm = "Uninstall " + item.Name + "?"
 		m.confirmDo = func() tea.Cmd {
-			return m.runAction("uninstall", removeCommand(item), actionOKMessage("uninstall", item),
-				func() error { return m.client.UninstallSkill(m.ctx, item) },
-				m.refreshInstalledCmd())
+			return m.startAction(actionStartMessage("uninstall", item),
+				m.runAction("uninstall", removeCommand(item), actionOKMessage("uninstall", item),
+					func() error { return m.client.UninstallSkill(m.ctx, item) },
+					m.refreshInstalledCmd()))
 		}
 	case "p":
 		m.mode = modeConfirm
 		m.confirm = "Prune orphaned locks?"
 		m.confirmDo = func() tea.Cmd {
-			return m.runAction("prune", "npx skills prune", "Pruned locks",
-				func() error { return m.client.PruneLocks(m.ctx) }, nil)
+			return m.startAction("Pruning orphaned locks…",
+				m.runAction("prune", "npx skills prune", "Pruned locks",
+					func() error { return m.client.PruneLocks(m.ctx) }, nil))
 		}
 	}
 	return nil
@@ -661,9 +685,10 @@ func (m *model) handleSources(k tea.KeyMsg) tea.Cmd {
 		if s.Name == "" {
 			return nil
 		}
-		return m.runAction("update-source", "refresh source", "Updated source "+s.Name,
-			func() error { return m.client.UpdateSource(m.ctx, s.Name) },
-			m.refreshSourcesCmd())
+		return m.startAction("Refreshing source "+s.Name+"…",
+			m.runAction("update-source", "refresh source", "Updated source "+s.Name,
+				func() error { return m.client.UpdateSource(m.ctx, s.Name) },
+				m.refreshSourcesCmd()))
 	case "d":
 		s := m.currentSource()
 		if s.Name == "" {
@@ -672,9 +697,10 @@ func (m *model) handleSources(k tea.KeyMsg) tea.Cmd {
 		m.mode = modeConfirm
 		m.confirm = "Remove source " + s.Name + "?"
 		m.confirmDo = func() tea.Cmd {
-			return m.runAction("remove-source", "Removed source "+s.Name, "Removed source "+s.Name,
-				func() error { return m.client.RemoveSource(m.ctx, s.Name) },
-				m.refreshSourcesCmd())
+			return m.startAction("Removing source "+s.Name+"…",
+				m.runAction("remove-source", "Removed source "+s.Name, "Removed source "+s.Name,
+					func() error { return m.client.RemoveSource(m.ctx, s.Name) },
+					m.refreshSourcesCmd()))
 		}
 	case "enter":
 		if m.sourcesSel <= 1 {
@@ -862,7 +888,9 @@ func (m *model) rootView() string {
 	// Build the body (header + list) so we can compute its height.
 	body := b.String()
 	footer := m.footer()
-	if m.message != "" {
+	if m.runningAction != "" {
+		footer += "\n" + m.style.dim.Render(m.spinner.View()+" "+m.runningAction)
+	} else if m.message != "" {
 		footer += "\n" + m.style.dim.Render(m.message)
 	}
 
@@ -1272,14 +1300,33 @@ func mergeDetailSkill(base, detail skills.Skill) skills.Skill {
 	return base
 }
 
-func (m *model) startInstall(item skills.Skill, global bool) tea.Cmd {
+func actionStartMessage(action string, item skills.Skill) string {
+	switch action {
+	case "install":
+		return "Installing " + item.Name + "…"
+	case "update":
+		return "Updating " + item.Name + "…"
+	case "uninstall":
+		return "Removing " + item.Name + "…"
+	default:
+		return action + " " + item.Name + "…"
+	}
+}
+
+func (m *model) startAction(message string, cmd tea.Cmd) tea.Cmd {
 	m.mode = modeNormal
-	m.message = "Installing " + item.Name + "…"
+	m.message = message
+	m.runningAction = message
+	return tea.Batch(m.spinner.Tick, cmd)
+}
+
+func (m *model) startInstall(item skills.Skill, global bool) tea.Cmd {
 	m.pendingInstall = skills.Skill{}
 	m.pendingInstallGlobal = false
-	return m.runAction("install", installCommand(item, global), actionOKMessage("install", item),
-		func() error { return m.client.InstallSkill(m.ctx, item, global) },
-		m.refreshInstalledCmd())
+	return m.startAction(actionStartMessage("install", item),
+		m.runAction("install", installCommand(item, global), actionOKMessage("install", item),
+			func() error { return m.client.InstallSkill(m.ctx, item, global) },
+			m.refreshInstalledCmd()))
 }
 
 // ─── Actions ─────────────────────────────────────────────────────────
@@ -1290,16 +1337,18 @@ func (m *model) runSelectedAction() tea.Cmd {
 	case TabInstalled:
 		switch m.actionSel {
 		case 0:
-			return m.runAction("update", updateCommand(item), actionOKMessage("update", item),
-				func() error { return m.client.UpdateSkill(m.ctx, item) },
-				m.refreshInstalledCmd())
+			return m.startAction(actionStartMessage("update", item),
+				m.runAction("update", updateCommand(item), actionOKMessage("update", item),
+					func() error { return m.client.UpdateSkill(m.ctx, item) },
+					m.refreshInstalledCmd()))
 		case 1:
 			m.mode = modeConfirm
 			m.confirm = "Uninstall " + item.Name + "?"
 			m.confirmDo = func() tea.Cmd {
-				return m.runAction("uninstall", removeCommand(item), actionOKMessage("uninstall", item),
-					func() error { return m.client.UninstallSkill(m.ctx, item) },
-					m.refreshInstalledCmd())
+				return m.startAction(actionStartMessage("uninstall", item),
+					m.runAction("uninstall", removeCommand(item), actionOKMessage("uninstall", item),
+						func() error { return m.client.UninstallSkill(m.ctx, item) },
+						m.refreshInstalledCmd()))
 			}
 		case 2:
 			m.mode = modeNormal
@@ -1565,16 +1614,18 @@ func (m *model) handleSourceDetailKey(k tea.KeyMsg) tea.Cmd {
 		m.mode = modeInstallScope
 		return nil
 	case "u":
-		return m.runAction("update-source", "refresh source", "Updated source "+m.sourceDetail.Name,
-			func() error { return m.client.UpdateSource(m.ctx, m.sourceDetail.Name) },
-			m.loadSourceSkillsCmd())
+		return m.startAction("Refreshing source "+m.sourceDetail.Name+"…",
+			m.runAction("update-source", "refresh source", "Updated source "+m.sourceDetail.Name,
+				func() error { return m.client.UpdateSource(m.ctx, m.sourceDetail.Name) },
+				m.loadSourceSkillsCmd()))
 	case "d":
 		m.mode = modeConfirm
 		m.confirm = "Remove source " + m.sourceDetail.Name + "?"
 		m.confirmDo = func() tea.Cmd {
-			return m.runAction("remove-source", "remove source from ~/.config/knit/knit.json", "Removed source "+m.sourceDetail.Name,
-				func() error { return m.client.RemoveSource(m.ctx, m.sourceDetail.Name) },
-				m.refreshSourcesCmd())
+			return m.startAction("Removing source "+m.sourceDetail.Name+"…",
+				m.runAction("remove-source", "remove source from ~/.config/knit/knit.json", "Removed source "+m.sourceDetail.Name,
+					func() error { return m.client.RemoveSource(m.ctx, m.sourceDetail.Name) },
+					m.refreshSourcesCmd()))
 		}
 	}
 	return nil

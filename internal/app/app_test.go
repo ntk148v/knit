@@ -392,8 +392,12 @@ func TestInstalledBulkSelectionAndUpdate(t *testing.T) {
 		t.Fatal("bulk update should return a command")
 	}
 	msg := cmd()
-	updated, _ = m.Update(msg)
-	m = updated.(*model)
+	for _, subCmd := range msg.(tea.BatchMsg) {
+		if am, ok := subCmd().(actionResultMsg); ok {
+			m.Update(am)
+			break
+		}
+	}
 	if strings.Join(client.updated, ",") != "one,two" {
 		t.Fatalf("updated=%v", client.updated)
 	}
@@ -591,10 +595,16 @@ func TestInstallScopeProjectAndGlobalCommands(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("project scope Enter should return a command")
 	}
-	msg := cmd()
-	r, ok := msg.(actionResultMsg)
-	if !ok {
-		t.Fatalf("expected actionResultMsg, got %T", msg)
+	msgs := cmd().(tea.BatchMsg)
+	var r actionResultMsg
+	for _, subCmd := range msgs {
+		if am, ok := subCmd().(actionResultMsg); ok {
+			r = am
+			break
+		}
+	}
+	if r.action == "" {
+		t.Fatal("expected actionResultMsg in batch")
 	}
 	if !strings.Contains(r.command, " -y") {
 		t.Fatalf("project command missing -y: %q", r.command)
@@ -610,10 +620,17 @@ func TestInstallScopeProjectAndGlobalCommands(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("global scope Enter should return a command")
 	}
-	msg = cmd()
-	r, ok = msg.(actionResultMsg)
-	if !ok {
-		t.Fatalf("expected actionResultMsg, got %T", msg)
+	msgs = cmd().(tea.BatchMsg)
+	found := false
+	for _, subCmd := range msgs {
+		if am, ok := subCmd().(actionResultMsg); ok {
+			r = am
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("expected actionResultMsg in batch")
 	}
 	if !strings.Contains(r.command, " -g ") || !strings.Contains(r.command, " -y") {
 		t.Fatalf("global command missing -g -y: %q", r.command)
@@ -1074,5 +1091,172 @@ func TestSourceDetailActionBackReturnsToSkillList(t *testing.T) {
 	}
 	if m.mode != modeSourceDetail {
 		t.Fatalf("mode=%v, want source detail", m.mode)
+	}
+}
+
+func TestSourceDetailActionInstallWorksThroughRealKeyFlow(t *testing.T) {
+	m := newTestModel()
+	m.tab = TabSources
+	m.mode = modeSourceDetail
+	m.sourceDetail = skills.Source{Name: "ntk148v/skills", Repo: "github.com/ntk148v/skills"}
+	m.sourceSkills = []skills.Skill{{Name: "grill-with-doc"}}
+	m.sourceSkillSel = 0
+
+	cmd := m.handleSourceDetailKey(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd == nil || m.mode != modeDetail || m.detailBack != modeSourceDetail {
+		t.Fatalf("enter should open detail from source list: mode=%v back=%v cmd=%v", m.mode, m.detailBack, cmd)
+	}
+
+	cmd = m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("c")})
+	if cmd != nil || m.mode != modeAction {
+		t.Fatalf("c should open actions: mode=%v cmd=%v", m.mode, cmd)
+	}
+
+	cmd = m.handleKey(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd != nil {
+		t.Fatalf("install action should open scope chooser without command, got %v", cmd)
+	}
+	if m.mode != modeInstallScope {
+		t.Fatalf("mode=%v, want install scope", m.mode)
+	}
+	if m.pendingInstall.Name != "grill-with-doc" || m.pendingInstall.Source != "ntk148v/skills" {
+		t.Fatalf("pending=%#v", m.pendingInstall)
+	}
+}
+
+func TestSourceDetailActionBackWorksThroughRealKeyFlow(t *testing.T) {
+	m := newTestModel()
+	m.tab = TabSources
+	m.mode = modeSourceDetail
+	m.sourceDetail = skills.Source{Name: "ntk148v/skills", Repo: "github.com/ntk148v/skills"}
+	m.sourceSkills = []skills.Skill{{Name: "grill-with-doc", Source: "ntk148v/skills"}}
+	m.sourceSkillSel = 0
+
+	cmd := m.handleSourceDetailKey(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd == nil || m.mode != modeDetail {
+		t.Fatalf("enter should open detail: mode=%v cmd=%v", m.mode, cmd)
+	}
+	cmd = m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("c")})
+	if cmd != nil || m.mode != modeAction {
+		t.Fatalf("c should open actions: mode=%v cmd=%v", m.mode, cmd)
+	}
+
+	m.actionSel = 1
+	cmd = m.handleKey(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd != nil {
+		t.Fatalf("back action should not run command, got %v", cmd)
+	}
+	if m.mode != modeSourceDetail {
+		t.Fatalf("mode=%v, want source detail", m.mode)
+	}
+}
+
+// ─── Spinner / action progress tests ─────────────────────────────────
+
+func TestStartActionSetsRunningSpinnerState(t *testing.T) {
+	m := newTestModel()
+	cmd := m.startAction("Updating caveman…", func() tea.Msg { return nil })
+	if cmd == nil {
+		t.Fatal("startAction should return wrapped command")
+	}
+	if m.mode != modeNormal {
+		t.Fatalf("mode=%v, want normal", m.mode)
+	}
+	if m.runningAction != "Updating caveman…" || m.message != "Updating caveman…" {
+		t.Fatalf("running=%q message=%q", m.runningAction, m.message)
+	}
+}
+
+func TestActionResultClearsRunningSpinnerState(t *testing.T) {
+	m := newTestModel()
+	m.runningAction = "Updating caveman…"
+	m.message = "Updating caveman…"
+
+	updated, _ := m.Update(actionResultMsg{action: "update", command: "npx skills update caveman -y", message: "Updated caveman"})
+	m = updated.(*model)
+
+	if m.runningAction != "" {
+		t.Fatalf("runningAction=%q, want cleared", m.runningAction)
+	}
+	if m.message != "Updated caveman" {
+		t.Fatalf("message=%q", m.message)
+	}
+}
+
+func TestUpdateShowsSpinnerImmediately(t *testing.T) {
+	m := newTestModel()
+	m.tab = TabInstalled
+	m.focus = focusList
+	m.installed = []skills.Skill{{Name: "caveman", Source: "ntk148v/skills", Scope: skills.ScopeProject, Enabled: true}}
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("u")})
+	m = updated.(*model)
+
+	if cmd == nil {
+		t.Fatal("update should start a command")
+	}
+	if m.runningAction != "Updating caveman…" {
+		t.Fatalf("runningAction=%q", m.runningAction)
+	}
+	if !strings.Contains(m.rootView(), "Updating caveman") {
+		t.Fatalf("root view missing running action:\n%s", m.rootView())
+	}
+}
+
+func TestUninstallConfirmShowsSpinnerImmediately(t *testing.T) {
+	m := newTestModel()
+	m.tab = TabInstalled
+	m.focus = focusList
+	m.installed = []skills.Skill{{Name: "caveman", Source: "ntk148v/skills", Scope: skills.ScopeProject, Enabled: true}}
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	m = updated.(*model)
+	if cmd != nil || m.mode != modeConfirm {
+		t.Fatalf("delete should open confirm, mode=%v cmd=%v", m.mode, cmd)
+	}
+
+	updated, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	m = updated.(*model)
+	if cmd == nil {
+		t.Fatal("confirmed uninstall should start a command")
+	}
+	if m.runningAction != "Removing caveman…" {
+		t.Fatalf("runningAction=%q", m.runningAction)
+	}
+}
+
+func TestSourceUpdateShowsSpinnerImmediately(t *testing.T) {
+	m := newTestModel()
+	m.tab = TabSources
+	m.focus = focusList
+	m.sources = []skills.Source{{Name: "ntk148v/skills", Repo: "github.com/ntk148v/skills"}}
+	m.sourcesSel = 2
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("u")})
+	m = updated.(*model)
+
+	if cmd == nil {
+		t.Fatal("source update should start a command")
+	}
+	if m.runningAction != "Refreshing source ntk148v/skills…" {
+		t.Fatalf("runningAction=%q", m.runningAction)
+	}
+}
+
+func TestBulkUpdateShowsSpinnerImmediately(t *testing.T) {
+	m := newTestModel()
+	m.tab = TabInstalled
+	m.focus = focusList
+	m.installed = []skills.Skill{{Name: "caveman", Source: "ntk148v/skills", Scope: skills.ScopeProject, Enabled: true}}
+	m.selectedInstalled[installedKey(m.installed[0])] = true
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("U")})
+	m = updated.(*model)
+
+	if cmd == nil {
+		t.Fatal("bulk update should start a command")
+	}
+	if m.runningAction != "Updating 1 selected skill(s)…" {
+		t.Fatalf("runningAction=%q", m.runningAction)
 	}
 }
