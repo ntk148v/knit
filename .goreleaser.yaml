@@ -65,18 +65,17 @@ nfpms:
         dst: /usr/share/doc/knit/README.md
 
 snapshot:
-  version_template: '{{ incpatch .Version }}-next'
+  version_template: "{{ incpatch .Version }}-next"
 
 changelog:
   use: github
   sort: asc
-  format: '* [{{ .SHA }}](https://github.com/ntk148v/knit/commit/{{ .SHA }}): {{ .Message }} ({{ .Logins | englishJoin }})'
   filters:
     exclude:
-      - '^docs:'
-      - '^test:'
-      - '^chore:'
-      - 'merge conflict'
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "merge conflict"
       - Merge pull request
       - Merge remote-tracking branch
       - Merge branch
