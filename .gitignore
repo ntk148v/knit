@@ -42,3 +42,5 @@ skills-lock.json
 
 graphify-out/cost.json        # local only
 graphify-out/cache/         # optional: commit for speed, skip to keep repo small
+
+.pi-subagents/
