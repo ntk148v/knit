@@ -34,8 +34,9 @@ archives:
         formats:
           - zip
     name_template: >-
-      {{ .ProjectName }}_ {{- title .Os }}_ {{- if eq .Arch "amd64" }}x86_64 {{-
-      else if eq .Arch "arm64" }}arm64 {{- end }}
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64{{- else if eq .Arch "arm64" }}arm64{{- end }}
     files:
       - LICENSE
       - README.md
@@ -67,7 +68,9 @@ snapshot:
   version_template: '{{ incpatch .Version }}-next'
 
 changelog:
+  use: github
   sort: asc
+  format: '* [{{ .SHA }}](https://github.com/ntk148v/knit/commit/{{ .SHA }}): {{ .Message }} ({{ .Logins | englishJoin }})'
   filters:
     exclude:
       - '^docs:'
