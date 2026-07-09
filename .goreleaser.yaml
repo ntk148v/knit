@@ -68,8 +68,9 @@ snapshot:
   version_template: "{{ incpatch .Version }}-next"
 
 changelog:
-  use: github
   sort: asc
+  use: github
+  format: '{{ .SHA }}: {{ .Message }}{{ if and (not .IsNightly) .Logins }} ({{ .Logins | listExclude "^@Copilot$" | englishJoin }}){{ end }}'
   filters:
     exclude:
       - "^docs:"
@@ -79,6 +80,21 @@ changelog:
       - Merge pull request
       - Merge remote-tracking branch
       - Merge branch
+  groups:
+    - title: "New Features"
+      regexp: '^.*?feat(\(.+\))??!?:.+$'
+      order: 100
+    - title: "Security updates"
+      regexp: '^.*?sec(\(.+\))??!?:.+$'
+      order: 150
+    - title: "Bug fixes"
+      regexp: '^.*?(fix|refactor)(\(.+\))??!?:.+$'
+      order: 200
+    - title: "Documentation updates"
+      regexp: ^.*?docs?(\(.+\))??!?:.+$
+      order: 400
+    - title: Other work
+      order: 9999
 
 release:
   github:
