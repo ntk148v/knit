@@ -41,7 +41,7 @@ if [ -z "$VERSION" ]; then
 fi
 
 # --- step 5: download & install ---
-ARCHIVE="knit_${VERSION}_${OS}_${ARCH}.tar.gz"
+ARCHIVE="knit_${OS}_${ARCH}.tar.gz"
 URL="https://github.com/$REPO/releases/download/$VERSION/$ARCHIVE"
 
 echo "==> Downloading knit $VERSION for $OS/$ARCH..."
